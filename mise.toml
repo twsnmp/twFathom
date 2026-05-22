@@ -3,3 +3,70 @@ python.github_attestations = false
 
 [tools]
 python = "3.11.10"
+
+[env]
+PYTHONPATH = "src:."
+PYTHONMALLOC = "default"
+
+[tasks.setup]
+description = "Setup development environment"
+run = """
+python -m venv .venv
+.venv/bin/pip install --upgrade pip
+.venv/bin/pip install briefcase pytest
+.venv/bin/pip install -e .
+"""
+
+[tasks.test]
+description = "Run tests"
+run = ".venv/bin/pytest"
+
+[tasks.build]
+description = "Build the application"
+run = """
+VERSION=$(git describe --tags --always 2>/dev/null || echo "0.0.0")
+VERSION=${VERSION#v}
+if [[ ! "$VERSION" =~ ^[0-9] ]]; then
+    VERSION="0.0.0+$VERSION"
+fi
+chmod -R a+rX src/ tests/
+.venv/bin/briefcase build -C "version=\\"$VERSION\\""
+"""
+
+[tasks.dev]
+description = "Run the application in dev mode"
+run = ".venv/bin/briefcase dev"
+
+[tasks.release-mac]
+description = "Package and Notarize the application for macOS release (PKG)"
+run = """
+APP_ID="$DEVELOPER_ID_APPLICATION"
+INST_ID="$DEVELOPER_ID_INSTALLER"
+
+VERSION=$(git describe --tags --always 2>/dev/null || echo "0.0.0")
+VERSION=${VERSION#v}
+if [[ ! "$VERSION" =~ ^[0-9] ]]; then
+    VERSION="0.0.0+$VERSION"
+fi
+
+echo "Fixing file permissions to prevent macOS installation read errors..."
+chmod -R a+rX src/ tests/
+
+echo "Building version $VERSION for macOS..."
+.venv/bin/briefcase build macOS --no-input -C "version=\\"$VERSION\\""
+
+echo "Cleaning up problematic object files for notarization..."
+# Delete any .o files in the Python framework that cause notarization failures
+find build/twfathom/macos/app/twFathom.app -name "*.o" -delete
+
+if [ -n "$APP_ID" ] && [ -n "$INST_ID" ]; then
+    .venv/bin/briefcase package macOS -p pkg --identity "$APP_ID" --installer-identity "$INST_ID" -C "version=\\"$VERSION\\""
+else
+    echo "Developer identities not fully set. Briefcase will show a selection list."
+    .venv/bin/briefcase package macOS -p pkg -C "version=\\"$VERSION\\""
+fi
+"""
+
+[tasks.clean]
+description = "Clean build artifacts"
+run = "rm -rf build logs .venv"
