@@ -7,6 +7,7 @@ python = "3.11.10"
 [env]
 PYTHONPATH = "src:."
 PYTHONMALLOC = "default"
+PIP_FIND_LINKS = "{{config_root}}/wheels"
 
 [tasks.setup]
 description = "Setup development environment"

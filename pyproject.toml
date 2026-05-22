@@ -34,7 +34,7 @@ requires = [
     "paho-mqtt==2.1.0",
     "httpx==0.28.1",
     "watchdog==4.0.0",
-    "wheels/proxy_tools-0.1.0-py3-none-any.whl",
+    "proxy-tools",
 ]
 
 [tool.briefcase.app.twfathom.macOS]

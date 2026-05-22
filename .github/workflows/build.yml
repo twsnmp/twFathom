@@ -20,12 +20,15 @@ jobs:
           - os: windows-latest
             artifact-path: "build/twfathom/windows/msi/*.msi"
             artifact-name: "twFathom-Windows.msi"
+            python-version: '3.11'
           - os: macos-13 # Standard intel/arm universal macOS runner
             artifact-path: "build/twfathom/macos/app/twFathom-*.dmg"
             artifact-name: "twFathom-macOS.dmg"
+            python-version: '3.11'
           - os: ubuntu-22.04
             artifact-path: "build/twfathom/linux/appimage/*.AppImage"
             artifact-name: "twFathom-Linux.AppImage"
+            python-version: '3.10'
 
     steps:
       - name: Checkout Code
@@ -34,7 +37,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11.10'
+          python-version: ${{ matrix.python-version }}
           cache: 'pip'
 
       - name: Install System Dependencies (Linux Only)
@@ -65,36 +68,26 @@ jobs:
 
       - name: Briefcase Create (Scaffold Build Environment)
         shell: bash
+        env:
+          PIP_FIND_LINKS: ${{ github.workspace }}/wheels
         run: |
-          export PIP_FIND_LINKS="$(pwd)/wheels"
-          export PIP_NO_BINARY=""
-          # On Windows, we use PowerShell env syntax or pass it
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            powershell -Command '$env:PIP_FIND_LINKS="wheels"; briefcase create --no-input'
-          else
-            briefcase create --no-input
-          fi
+          briefcase create --no-input
 
       - name: Briefcase Build
         shell: bash
+        env:
+          PIP_FIND_LINKS: ${{ github.workspace }}/wheels
         run: |
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            powershell -Command '$env:PIP_FIND_LINKS="wheels"; briefcase build --no-input'
-          else
-            export PIP_FIND_LINKS="$(pwd)/wheels"
-            briefcase build --no-input
-          fi
+          briefcase build --no-input
 
       - name: Briefcase Package (Create Installer)
         shell: bash
+        env:
+          PIP_FIND_LINKS: ${{ github.workspace }}/wheels
         run: |
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            powershell -Command '$env:PIP_FIND_LINKS="wheels"; briefcase package --no-input'
-          elif [ "${{ matrix.os }}" = "macos-13" ]; then
-            export PIP_FIND_LINKS="$(pwd)/wheels"
+          if [ "${{ matrix.os }}" = "macos-13" ]; then
             briefcase package --adhoc-sign --no-input
           else
-            export PIP_FIND_LINKS="$(pwd)/wheels"
             briefcase package --no-input
           fi
 
