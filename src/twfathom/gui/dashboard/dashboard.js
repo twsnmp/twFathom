@@ -1,6 +1,7 @@
 let sourceId = null;
 let chart = null;
 let dataType = 'unknown';
+let lastDataSignature = '';
 
 // Parse query params to get source ID
 const urlParams = new URLSearchParams(window.location.search);
@@ -24,12 +25,13 @@ function initChart(type, data) {
     const chartDom = document.getElementById('main-chart');
     if (!chartDom) return;
     
-    // Clear old chart
-    if (chart) {
-        chart.dispose();
+    if (!chart) {
+        chart = echarts.init(chartDom);
+        // Make responsive
+        window.addEventListener('resize', () => {
+            if (chart) chart.resize();
+        });
     }
-    
-    chart = echarts.init(chartDom);
     
     let option = {};
     const timestamps = data.map(d => {
@@ -224,12 +226,7 @@ function initChart(type, data) {
         };
     }
     
-    chart.setOption(option);
-    
-    // Make responsive
-    window.addEventListener('resize', () => {
-        if (chart) chart.resize();
-    });
+    chart.setOption(option, true);
 }
 
 // Refresh KPI Cards
@@ -323,13 +320,23 @@ async function pollDashboard() {
         if (dataType === 'environment') {
             document.getElementById('chart-main-title').textContent = '環境センサー 時系列データ';
             const history = await window.pywebview.api.get_environment_history(sourceId, 100);
-            updateKpiCards('environment', history[history.length - 1]);
-            initChart('environment', history);
+            
+            const signature = history.length > 0 ? `${history.length}_${history[history.length - 1].timestamp}` : 'empty';
+            if (signature !== lastDataSignature) {
+                lastDataSignature = signature;
+                updateKpiCards('environment', history[history.length - 1]);
+                initChart('environment', history);
+            }
         } else if (dataType === 'traffic') {
             document.getElementById('chart-main-title').textContent = 'ネットワークトラフィック 時系列データ';
             const history = await window.pywebview.api.get_traffic_history(sourceId, 100);
-            updateKpiCards('traffic', history[history.length - 1]);
-            initChart('traffic', history);
+            
+            const signature = history.length > 0 ? `${history.length}_${history[history.length - 1].timestamp}` : 'empty';
+            if (signature !== lastDataSignature) {
+                lastDataSignature = signature;
+                updateKpiCards('traffic', history[history.length - 1]);
+                initChart('traffic', history);
+            }
         } else {
             // Unknown datatype yet
             updateKpiCards('unknown', null);
