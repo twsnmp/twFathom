@@ -54,5 +54,15 @@ class TestParsers(unittest.TestCase):
         self.assertEqual(results[0]['rx_pps'], 100.0)
         self.assertEqual(results[1]['tx_pps'], 160.0)
 
+    def test_environment_openweathermap(self):
+        payload = '{"coord":{"lon":139.5577,"lat":35.8578},"weather":[{"id":804,"main":"Clouds","description":"overcast clouds","icon":"04n"}],"base":"stations","main":{"temp":11.86,"feels_like":11.35,"temp_min":11.65,"temp_max":12.79,"pressure":1020,"humidity":86,"sea_level":1020,"grnd_level":1014},"visibility":10000,"wind":{"speed":2.81,"deg":29,"gust":2.81},"clouds":{"all":100},"dt":1779476805,"sys":{"type":2,"id":2091017,"country":"JP","sunrise":1779478283,"sunset":1779529552},"timezone":32400,"id":1850144,"name":"Fujimi","cod":200}'
+        dtype, results = auto_parse_and_map(payload)
+        
+        self.assertEqual(dtype, 'environment')
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['temperature'], 11.86)
+        self.assertEqual(results[0]['humidity'], 86.0)
+        self.assertEqual(results[0]['pressure'], 1020.0)
+
 if __name__ == '__main__':
     unittest.main()

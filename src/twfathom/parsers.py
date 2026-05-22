@@ -29,6 +29,27 @@ TRAFFIC_MAPS = {
     'tx_bps': [re.compile(r'tx_?bps$', re.I), re.compile(r'tx_?bytes?$', re.I), re.compile(r't_?bps$', re.I)]
 }
 
+def match_key(key, patterns):
+    """
+    Checks if a key (or its nested parts) matches any of the given patterns.
+    E.g., "main_temp" should match a pattern for "temp" or "temperature".
+    """
+    key_str = str(key).strip()
+    # 1. Exact match / full match on the whole key
+    if any(pat.match(key_str) for pat in patterns):
+        return True
+        
+    # 2. Match sub-parts joined by underscore from right to left
+    # e.g. "device_rx_pps" -> check "rx_pps", then "pps"
+    parts = key_str.split('_')
+    if len(parts) > 1:
+        for i in range(1, len(parts)):
+            sub_key = '_'.join(parts[i:])
+            if any(pat.match(sub_key) for pat in patterns):
+                return True
+                
+    return False
+
 def detect_data_type(keys):
     """
     Given a list of keys (headers), detect if it represents 'environment' or 'traffic' data.
@@ -58,7 +79,7 @@ def map_fields(data_dict, schema_type):
         for target, patterns in ENV_MAPS.items():
             mapped[target] = None
             for key, val in data_dict.items():
-                if any(pat.match(str(key).strip()) for pat in patterns):
+                if match_key(key, patterns):
                     try:
                         mapped[target] = float(val)
                         break
@@ -68,7 +89,7 @@ def map_fields(data_dict, schema_type):
         for target, patterns in TRAFFIC_MAPS.items():
             mapped[target] = None
             for key, val in data_dict.items():
-                if any(pat.match(str(key).strip()) for pat in patterns):
+                if match_key(key, patterns):
                     try:
                         mapped[target] = float(val)
                         break
