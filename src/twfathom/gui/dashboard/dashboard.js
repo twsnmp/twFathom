@@ -47,8 +47,8 @@ function initChart(type, data) {
     const baseGrid = {
         left: '4%',
         right: '4%',
-        bottom: '10%',
-        top: '12%',
+        bottom: '60px',
+        top: '45px',
         containLabel: true
     };
     
@@ -59,6 +59,53 @@ function initChart(type, data) {
         textStyle: { color: '#f3f4f6' },
         axisPointer: { type: 'cross' }
     };
+    
+    // Dynamically focus on the latest 30 points if the history becomes long,
+    // while still letting the user zoom out/pan backwards.
+    let startZoom = 0;
+    if (data.length > 30) {
+        startZoom = Math.round((1 - 30 / data.length) * 100);
+    }
+    
+    const baseDataZoom = [
+        {
+            type: 'slider',
+            show: true,
+            xAxisIndex: [0],
+            start: startZoom,
+            end: 100,
+            height: 16,
+            bottom: 12,
+            borderColor: 'rgba(255, 255, 255, 0.08)',
+            backgroundColor: 'rgba(255, 255, 255, 0.01)',
+            fillerColor: 'rgba(0, 210, 255, 0.08)',
+            handleIcon: 'path://M-1.5,0.5c0-0.2,0.1-0.4,0.3-0.5c0.2-0.1,0.4-0.1,0.6,0c0.2,0.1,0.3,0.3,0.3,0.5v15c0,0.2-0.1,0.4-0.3,0.5c-0.2,0.1-0.4,0.1-0.6,0c-0.2-0.1-0.3-0.3-0.3-0.5V0.5z',
+            handleSize: '120%',
+            handleStyle: {
+                color: '#00d2ff',
+                borderColor: 'rgba(0, 210, 255, 0.4)',
+                shadowBlur: 3,
+                shadowColor: 'rgba(0, 210, 255, 0.2)'
+            },
+            moveHandleStyle: {
+                color: 'rgba(0, 210, 255, 0.2)'
+            },
+            textStyle: {
+                color: '#9ca3af',
+                fontFamily: 'Inter',
+                fontSize: 9
+            },
+            brushSelect: false
+        },
+        {
+            type: 'inside',
+            xAxisIndex: [0],
+            start: startZoom,
+            end: 100,
+            zoomOnMouseWheel: true,
+            moveOnMouseMove: true
+        }
+    ];
     
     if (type === 'environment') {
         const temps = data.map(d => d.temperature);
@@ -73,6 +120,7 @@ function initChart(type, data) {
                 textStyle: { color: '#9ca3af', fontFamily: 'Inter' }
             },
             grid: baseGrid,
+            dataZoom: baseDataZoom,
             xAxis: {
                 type: 'category',
                 boundaryGap: false,
@@ -154,6 +202,7 @@ function initChart(type, data) {
                 textStyle: { color: '#9ca3af', fontFamily: 'Inter' }
             },
             grid: baseGrid,
+            dataZoom: baseDataZoom,
             xAxis: {
                 type: 'category',
                 boundaryGap: false,

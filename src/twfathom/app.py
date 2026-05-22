@@ -28,9 +28,15 @@ def main():
     )
     api_bridge._main_window = main_window
     
-    # Shut down collectors gracefully when closing the main window
+    # Shut down collectors gracefully and close all sub-windows when closing the main window
     def on_closed():
         collectors.stop_all_collectors()
+        # Close all active dashboard sub-windows
+        for sub_win in list(api_bridge._dashboard_windows.values()):
+            try:
+                sub_win.destroy()
+            except Exception:
+                pass
         
     main_window.events.closed += on_closed
     

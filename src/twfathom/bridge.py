@@ -93,8 +93,8 @@ class Bridge:
         sub_window = webview.create_window(
             title=f"twFathom - {source['name']} Dashboard",
             url=url,
-            width=950,
-            height=650,
+            width=640,
+            height=480,
             resizable=True,
             js_api=self
         )
