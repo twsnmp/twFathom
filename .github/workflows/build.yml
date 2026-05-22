@@ -28,7 +28,7 @@ jobs:
           - os: ubuntu-22.04
             artifact-path: "build/twfathom/linux/appimage/*.AppImage"
             artifact-name: "twFathom-Linux.AppImage"
-            python-version: '3.10'
+            python-version: '3.10.12'
 
     steps:
       - name: Checkout Code
