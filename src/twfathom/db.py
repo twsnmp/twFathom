@@ -195,3 +195,11 @@ def get_traffic_history(source_id, limit=100):
     rows = cursor.fetchall()
     conn.close()
     return [dict(r) for r in reversed(rows)]
+
+def clear_source_data(source_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM environment_data WHERE source_id = ?", (source_id,))
+    cursor.execute("DELETE FROM traffic_data WHERE source_id = ?", (source_id,))
+    conn.commit()
+    conn.close()

@@ -99,3 +99,12 @@ class Bridge:
             js_api=self
         )
         self._dashboard_windows[source_id] = sub_window
+
+    def clear_source_data(self, source_id):
+        try:
+            db.clear_source_data(source_id)
+        except Exception as e:
+            import traceback
+            print(f"Error in clear_source_data: {e}")
+            traceback.print_exc()
+            raise e

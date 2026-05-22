@@ -192,6 +192,9 @@ async function loadSources() {
                         <button class="icon-btn" title="編集" onclick="openEditModal(${src.id}, '${escapeQuote(src.name)}', '${src.type}', '${safeConfig}', ${src.interval})">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
                         </button>
+                        <button class="icon-btn icon-btn-danger" title="データ履歴をクリア" onclick="clearSourceData(${src.id})">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5V19A9 3 0 0 0 21 19V5"></path><path d="M3 12A9 3 0 0 0 21 12"></path><line x1="3" y1="21" x2="21" y2="3"></line></svg>
+                        </button>
                         <button class="icon-btn icon-btn-danger" title="削除" onclick="deleteSource(${src.id})">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                         </button>
@@ -223,6 +226,19 @@ async function deleteSource(id) {
         } catch (err) {
             console.error("Failed to delete source:", err);
             alert("削除中にエラーが発生しました。\n" + err);
+        }
+    }
+}
+
+async function clearSourceData(id) {
+    if (confirm("このデータソースのデータ履歴のみを削除してもよろしいですか？データソースの設定は残ります。")) {
+        try {
+            await window.pywebview.api.clear_source_data(id);
+            alert("データ履歴をクリアしました。");
+            loadSources();
+        } catch (err) {
+            console.error("Failed to clear source data:", err);
+            alert("データクリア中にエラーが発生しました。\n" + err);
         }
     }
 }
