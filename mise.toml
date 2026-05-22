@@ -59,6 +59,11 @@ echo "Cleaning up problematic object files for notarization..."
 # Delete any .o files in the Python framework that cause notarization failures
 find build/twfathom/macos/app/twFathom.app -name "*.o" -delete
 
+echo "Injecting custom installer welcome screen and icon..."
+mkdir -p build/twfathom/macos/app/installer/resources
+cp src/twfathom/resources/welcome.html build/twfathom/macos/app/installer/resources/welcome.html
+cp src/twfathom/resources/installer_icon.png build/twfathom/macos/app/installer/resources/installer_icon.png
+
 if [ -n "$APP_ID" ] && [ -n "$INST_ID" ]; then
     .venv/bin/briefcase package macOS -p pkg --identity "$APP_ID" --installer-identity "$INST_ID" -C "version=\\"$VERSION\\""
 else
