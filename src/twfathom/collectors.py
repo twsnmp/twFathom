@@ -56,7 +56,8 @@ def https_poll_loop(source_id, config, interval, stop_event):
                                         pressure=row.get('pressure'),
                                         co2=row.get('co2'),
                                         soil_moisture=row.get('soil_moisture'),
-                                        illuminance=row.get('illuminance')
+                                        illuminance=row.get('illuminance'),
+                                        timestamp=row.get('timestamp')
                                     )
                                     print(f"  Inserted Environment: Temp={row.get('temperature')}, Humid={row.get('humidity')}, Lux={row.get('illuminance')}")
                                 elif data_type == 'traffic':
@@ -65,7 +66,8 @@ def https_poll_loop(source_id, config, interval, stop_event):
                                         rx_pps=row.get('rx_pps'),
                                         tx_pps=row.get('tx_pps'),
                                         rx_bps=row.get('rx_bps'),
-                                        tx_bps=row.get('tx_bps')
+                                        tx_bps=row.get('tx_bps'),
+                                        timestamp=row.get('timestamp')
                                     )
                                     print(f"  Inserted Traffic: RxBps={row.get('rx_bps')}, TxBps={row.get('tx_bps')}")
         except Exception as e:
@@ -114,7 +116,8 @@ def file_poll_loop(source_id, config, interval, stop_event):
                                         pressure=row.get('pressure'),
                                         co2=row.get('co2'),
                                         soil_moisture=row.get('soil_moisture'),
-                                        illuminance=row.get('illuminance')
+                                        illuminance=row.get('illuminance'),
+                                        timestamp=row.get('timestamp')
                                     )
                                     print(f"  Inserted Environment: Temp={row.get('temperature')}, Humid={row.get('humidity')}, Lux={row.get('illuminance')}")
                                 elif data_type == 'traffic':
@@ -123,7 +126,8 @@ def file_poll_loop(source_id, config, interval, stop_event):
                                         rx_pps=row.get('rx_pps'),
                                         tx_pps=row.get('tx_pps'),
                                         rx_bps=row.get('rx_bps'),
-                                        tx_bps=row.get('tx_bps')
+                                        tx_bps=row.get('tx_bps'),
+                                        timestamp=row.get('timestamp')
                                     )
                                     print(f"  Inserted Traffic: RxBps={row.get('rx_bps')}, TxBps={row.get('tx_bps')}")
             elif filepath and not os.path.exists(filepath):
@@ -191,7 +195,8 @@ def mqtt_listener(source_id, config, stop_event):
                                 pressure=row.get('pressure'),
                                 co2=row.get('co2'),
                                 soil_moisture=row.get('soil_moisture'),
-                                illuminance=row.get('illuminance')
+                                illuminance=row.get('illuminance'),
+                                timestamp=row.get('timestamp')
                             )
                             print(f"  Inserted Environment: Temp={row.get('temperature')}, Humid={row.get('humidity')}, Lux={row.get('illuminance')}")
                         elif data_type == 'traffic':
@@ -200,7 +205,8 @@ def mqtt_listener(source_id, config, stop_event):
                                 rx_pps=row.get('rx_pps'),
                                 tx_pps=row.get('tx_pps'),
                                 rx_bps=row.get('rx_bps'),
-                                tx_bps=row.get('tx_bps')
+                                tx_bps=row.get('tx_bps'),
+                                timestamp=row.get('timestamp')
                             )
                             print(f"  Inserted Traffic: RxBps={row.get('rx_bps')}, TxBps={row.get('tx_bps')}")
                 else:

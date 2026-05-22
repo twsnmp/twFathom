@@ -29,6 +29,15 @@ TRAFFIC_MAPS = {
     'tx_bps': [re.compile(r'tx_?bps$', re.I), re.compile(r'tx_?bytes?$', re.I), re.compile(r't_?bps$', re.I)]
 }
 
+TIMESTAMP_MAPS = [
+    re.compile(r'time(stamp)?$', re.I),
+    re.compile(r'date(time)?$', re.I),
+    re.compile(r'^dt$', re.I),
+    re.compile(r'時刻$', re.I),
+    re.compile(r'日付$', re.I),
+    re.compile(r'日時$', re.I)
+]
+
 def match_key(key, patterns):
     """
     Checks if a key (or its nested parts) matches any of the given patterns.
@@ -73,8 +82,27 @@ def detect_data_type(keys):
 def map_fields(data_dict, schema_type):
     """
     Maps a dictionary of arbitrary keys to the standard environment or traffic dictionary structure.
+    Includes mapping for an optional timestamp field.
     """
     mapped = {}
+    
+    # 1. Map optional timestamp field if present
+    mapped['timestamp'] = None
+    for key, val in data_dict.items():
+        if match_key(key, TIMESTAMP_MAPS):
+            try:
+                # Handle numeric UNIX timestamps (e.g. 1779476805)
+                val_float = float(val)
+                if val_float > 1000000000:
+                    from datetime import datetime
+                    mapped['timestamp'] = datetime.fromtimestamp(val_float).isoformat()
+                else:
+                    mapped['timestamp'] = str(val).strip()
+            except (ValueError, TypeError):
+                mapped['timestamp'] = str(val).strip()
+            break
+            
+    # 2. Map schema-specific fields
     if schema_type == 'environment':
         for target, patterns in ENV_MAPS.items():
             mapped[target] = None

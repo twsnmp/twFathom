@@ -1,0 +1,29 @@
+[
+  {
+    "timestamp": "2026-05-23T04:00:00",
+    "temp": 25.4,
+    "humidity": 60.2,
+    "pressure": 1011.5,
+    "co2": 520,
+    "soil_moisture": 28.1,
+    "lux": 350.5
+  },
+  {
+    "timestamp": "2026-05-23T04:01:00",
+    "temp": 25.8,
+    "humidity": 59.8,
+    "pressure": 1011.2,
+    "co2": 525,
+    "soil_moisture": 28.0,
+    "lux": 360.0
+  },
+  {
+    "timestamp": "2026-05-23T04:02:00",
+    "temp": 26.1,
+    "humidity": 59.0,
+    "pressure": 1011.0,
+    "co2": 530,
+    "soil_moisture": 27.9,
+    "lux": 355.2
+  }
+]

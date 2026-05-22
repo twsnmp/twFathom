@@ -64,5 +64,104 @@ class TestParsers(unittest.TestCase):
         self.assertEqual(results[0]['humidity'], 86.0)
         self.assertEqual(results[0]['pressure'], 1020.0)
 
+class TestFileParsers(unittest.TestCase):
+    def setUp(self):
+        self.data_dir = os.path.join(os.path.dirname(__file__), 'test_data')
+
+    def read_file(self, filename):
+        filepath = os.path.join(self.data_dir, filename)
+        with open(filepath, 'r', encoding='utf-8') as f:
+            return f.read()
+
+    def test_environment_json_single_file(self):
+        payload = self.read_file('environment_single.json')
+        dtype, results = auto_parse_and_map(payload)
+        
+        self.assertEqual(dtype, 'environment')
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['timestamp'], '2026-05-23T04:00:00')
+        self.assertEqual(results[0]['temperature'], 25.4)
+        self.assertEqual(results[0]['humidity'], 60.2)
+        self.assertEqual(results[0]['pressure'], 1011.5)
+        self.assertEqual(results[0]['co2'], 520.0)
+        self.assertEqual(results[0]['soil_moisture'], 28.1)
+        self.assertEqual(results[0]['illuminance'], 350.5)
+
+    def test_environment_json_multi_file(self):
+        payload = self.read_file('environment_multi.json')
+        dtype, results = auto_parse_and_map(payload)
+        
+        self.assertEqual(dtype, 'environment')
+        self.assertEqual(len(results), 3)
+        self.assertEqual(results[0]['timestamp'], '2026-05-23T04:00:00')
+        self.assertEqual(results[1]['timestamp'], '2026-05-23T04:01:00')
+        self.assertEqual(results[2]['timestamp'], '2026-05-23T04:02:00')
+        self.assertEqual(results[0]['temperature'], 25.4)
+        self.assertEqual(results[1]['temperature'], 25.8)
+        self.assertEqual(results[2]['temperature'], 26.1)
+
+    def test_environment_csv_file(self):
+        payload = self.read_file('environment.csv')
+        dtype, results = auto_parse_and_map(payload)
+        
+        self.assertEqual(dtype, 'environment')
+        self.assertEqual(len(results), 4)
+        self.assertEqual(results[0]['timestamp'], '2026-05-23T04:00:00')
+        self.assertEqual(results[1]['timestamp'], '2026-05-23T04:01:00')
+        self.assertEqual(results[2]['timestamp'], '2026-05-23T04:02:00')
+        self.assertEqual(results[3]['timestamp'], '2026-05-23T04:03:00')
+        self.assertEqual(results[0]['temperature'], 22.5)
+        self.assertEqual(results[0]['soil_moisture'], 30.5)
+        self.assertEqual(results[0]['illuminance'], 120.0)
+        self.assertEqual(results[1]['temperature'], 23.0)
+        self.assertEqual(results[1]['soil_moisture'], 31.0)
+        self.assertEqual(results[1]['illuminance'], 125.5)
+        self.assertEqual(results[2]['temperature'], 23.5)
+        self.assertEqual(results[3]['temperature'], 24.0)
+
+    def test_traffic_json_list_file(self):
+        payload = self.read_file('traffic_list.json')
+        dtype, results = auto_parse_and_map(payload)
+        
+        self.assertEqual(dtype, 'traffic')
+        self.assertEqual(len(results), 3)
+        self.assertEqual(results[0]['timestamp'], '2026-05-23T04:00:00')
+        self.assertEqual(results[1]['timestamp'], '2026-05-23T04:01:00')
+        self.assertEqual(results[2]['timestamp'], '2026-05-23T04:02:00')
+        self.assertEqual(results[0]['rx_pps'], 100.0)
+        self.assertEqual(results[0]['tx_pps'], 150.0)
+        self.assertEqual(results[0]['rx_bps'], 80000.0)
+        self.assertEqual(results[0]['tx_bps'], 120000.0)
+        self.assertEqual(results[1]['rx_pps'], 110.0)
+        self.assertEqual(results[2]['rx_pps'], 105.0)
+
+    def test_traffic_csv_file(self):
+        payload = self.read_file('traffic.csv')
+        dtype, results = auto_parse_and_map(payload)
+        
+        self.assertEqual(dtype, 'traffic')
+        self.assertEqual(len(results), 4)
+        self.assertEqual(results[0]['timestamp'], '2026-05-23T04:00:00')
+        self.assertEqual(results[1]['timestamp'], '2026-05-23T04:01:00')
+        self.assertEqual(results[2]['timestamp'], '2026-05-23T04:02:00')
+        self.assertEqual(results[3]['timestamp'], '2026-05-23T04:03:00')
+        self.assertEqual(results[0]['rx_pps'], 100.0)
+        self.assertEqual(results[1]['tx_pps'], 160.0)
+        self.assertEqual(results[2]['rx_pps'], 105.0)
+        self.assertEqual(results[3]['rx_pps'], 120.0)
+
+    def test_environment_openweathermap_file(self):
+        payload = self.read_file('environment_openweathermap.json')
+        dtype, results = auto_parse_and_map(payload)
+        
+        self.assertEqual(dtype, 'environment')
+        self.assertEqual(len(results), 1)
+        self.assertIsNotNone(results[0]['timestamp'])
+        self.assertEqual(results[0]['temperature'], 11.86)
+        self.assertEqual(results[0]['humidity'], 86.0)
+        self.assertEqual(results[0]['pressure'], 1020.0)
+
 if __name__ == '__main__':
     unittest.main()
+
+

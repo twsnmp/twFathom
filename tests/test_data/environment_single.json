@@ -1,0 +1,9 @@
+{
+  "timestamp": "2026-05-23T04:00:00",
+  "temp": 25.4,
+  "humidity": 60.2,
+  "pressure": 1011.5,
+  "co2": 520,
+  "soil_moisture": 28.1,
+  "lux": 350.5
+}
