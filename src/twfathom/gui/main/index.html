@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>twFathom - Main Console</title>
+    <link rel="stylesheet" href="../common/css/theme.css">
+    <style>
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+        }
+
+        .source-table-container {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        th {
+            font-family: var(--font-outfit);
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        tr {
+            transition: all 0.3s ease;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.01);
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        .badge-active {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--color-success);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .badge-paused {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--color-warning);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        .badge-type {
+            background: rgba(0, 210, 255, 0.1);
+            color: var(--color-primary);
+            border: 1px solid rgba(0, 210, 255, 0.2);
+        }
+
+        .badge-datatype {
+            background: rgba(189, 0, 255, 0.1);
+            color: var(--color-secondary);
+            border: 1px solid rgba(189, 0, 255, 0.2);
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 8px;
+        }
+
+        .icon-btn {
+            background: none;
+            border: 1px solid var(--glass-border);
+            color: var(--text-secondary);
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .icon-btn:hover {
+            color: var(--text-primary);
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .icon-btn-primary:hover {
+            border-color: var(--color-primary);
+            color: var(--color-primary);
+            box-shadow: 0 0 10px rgba(0, 210, 255, 0.15);
+        }
+
+        .icon-btn-danger:hover {
+            border-color: var(--color-danger);
+            color: var(--color-danger);
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.15);
+        }
+
+        /* Modal styling */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 6, 9, 0.8);
+            backdrop-filter: blur(10px);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            width: 90%;
+            max-width: 550px;
+            animation: modalFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes modalFadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95) translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .type-config {
+            display: none;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="header animate-fade-in">
+        <div>
+            <h1><span class="title-gradient">twFathom</span> <span style="font-weight: 300; font-size: 20px;">Data Console</span></h1>
+        </div>
+        <button class="glass-btn glass-btn-primary" onclick="openAddModal()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            新規ソース追加
+        </button>
+    </div>
+
+    <!-- Source List Table -->
+    <div class="glass-card source-table-container animate-fade-in" style="animation-delay: 0.1s;">
+        <table id="source-table">
+            <thead>
+                <tr>
+                    <th>ソース名</th>
+                    <th>種類</th>
+                    <th>収集間隔 (秒)</th>
+                    <th>判定データ種別</th>
+                    <th>ステータス</th>
+                    <th style="text-align: right;">アクション</th>
+                </tr>
+            </thead>
+            <tbody id="source-list">
+                <!-- Dynamic Content -->
+            </tbody>
+        </table>
+        <div id="no-data-msg" class="no-data" style="display: none;">
+            データソースが登録されていません。「新規ソース追加」ボタンから登録してください。
+        </div>
+    </div>
+
+    <!-- Modal Form for Add/Edit Source -->
+    <div id="source-modal" class="modal">
+        <div class="glass-card modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title" class="title-gradient">新規ソース登録</h2>
+                <button class="icon-btn" onclick="closeModal()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            
+            <form id="source-form" onsubmit="saveSource(event)">
+                <input type="hidden" id="form-source-id">
+                
+                <div class="form-group">
+                    <label for="form-name">表示名</label>
+                    <input type="text" id="form-name" class="glass-input" placeholder="例: リビング環境モニター" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="form-type">ソースの種類</label>
+                    <select id="form-type" class="glass-input glass-select" onchange="handleTypeChange()" required>
+                        <option value="mqtt">MQTT ブローカー</option>
+                        <option value="https">HTTPS URL (JSON / CSV)</option>
+                        <option value="file">ローカルファイル (JSON / CSV)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="form-interval">収集間隔 (秒)</label>
+                    <input type="number" id="form-interval" class="glass-input" min="1" value="5" required>
+                </div>
+
+                <!-- MQTT Configuration fields -->
+                <div id="config-mqtt" class="type-config">
+                    <div class="form-group">
+                        <label for="mqtt-broker">ブローカー ホスト/URL</label>
+                        <input type="text" id="mqtt-broker" class="glass-input" placeholder="例: broker.hivemq.com">
+                    </div>
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label for="mqtt-port">ポート番号</label>
+                            <input type="number" id="mqtt-port" class="glass-input" value="1883">
+                        </div>
+                        <div class="form-group">
+                            <label for="mqtt-topic">トピック</label>
+                            <input type="text" id="mqtt-topic" class="glass-input" placeholder="例: room/sensors">
+                        </div>
+                    </div>
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label for="mqtt-username">ユーザー名 (任意)</label>
+                            <input type="text" id="mqtt-username" class="glass-input" placeholder="ユーザー名なし">
+                        </div>
+                        <div class="form-group">
+                            <label for="mqtt-password">パスワード (任意)</label>
+                            <input type="password" id="mqtt-password" class="glass-input" placeholder="パスワードなし">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HTTPS Configuration fields -->
+                <div id="config-https" class="type-config">
+                    <div class="form-group">
+                        <label for="https-url">リクエスト URL</label>
+                        <input type="url" id="https-url" class="glass-input" placeholder="https://api.example.com/metrics">
+                    </div>
+                    <div class="form-group">
+                        <label for="https-method">HTTP メソッド</label>
+                        <select id="https-method" class="glass-input glass-select">
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="https-headers">ヘッダー JSON (任意)</label>
+                        <textarea id="https-headers" class="glass-input" rows="2" placeholder='{"Authorization": "Bearer ...", "Content-Type": "application/json"}'></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="https-params">POSTパラメータ JSON (任意)</label>
+                        <textarea id="https-params" class="glass-input" rows="2" placeholder='{"device_id": "12345"}'></textarea>
+                    </div>
+                </div>
+
+                <!-- File Configuration fields -->
+                <div id="config-file" class="type-config">
+                    <div class="form-group">
+                        <label for="file-path">ファイル絶対パス</label>
+                        <input type="text" id="file-path" class="glass-input" placeholder="例: /Users/username/data/sensor.csv">
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                    <button type="button" class="glass-btn" onclick="closeModal()">キャンセル</button>
+                    <button type="submit" class="glass-btn glass-btn-primary">保存する</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>

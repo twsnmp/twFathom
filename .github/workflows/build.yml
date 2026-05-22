@@ -1,0 +1,159 @@
+name: Build and Release twFathom
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Package App (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact-path: "build/twfathom/windows/msi/*.msi"
+            artifact-name: "twFathom-Windows.msi"
+          - os: macos-13 # Standard intel/arm universal macOS runner
+            artifact-path: "build/twfathom/macos/app/twFathom-*.dmg"
+            artifact-name: "twFathom-macOS.dmg"
+          - os: ubuntu-22.04
+            artifact-path: "build/twfathom/linux/appimage/*.AppImage"
+            artifact-name: "twFathom-Linux.AppImage"
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.10'
+          cache: 'pip'
+
+      - name: Install System Dependencies (Linux Only)
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3-dev \
+            python3-gi \
+            python3-gi-cairo \
+            gir1.2-gtk-3.0 \
+            libgirepository1.0-dev \
+            libcairo2-dev \
+            pkg-config \
+            libwebkit2gtk-4.0-dev \
+            desktop-file-utils
+
+      - name: Install Briefcase
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install briefcase wheel
+
+      - name: Pre-build Dependency Wheels (Avoid proxy-tools blocker)
+        shell: bash
+        run: |
+          mkdir -p wheels
+          python -m pip wheel proxy-tools --wheel-dir=wheels
+
+      - name: Briefcase Create (Scaffold Build Environment)
+        shell: bash
+        run: |
+          export PIP_FIND_LINKS="$(pwd)/wheels"
+          export PIP_NO_BINARY=""
+          # On Windows, we use PowerShell env syntax or pass it
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            powershell -Command '$env:PIP_FIND_LINKS="wheels"; briefcase create --no-input'
+          else
+            briefcase create --no-input
+          fi
+
+      - name: Briefcase Build
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            powershell -Command '$env:PIP_FIND_LINKS="wheels"; briefcase build --no-input'
+          else
+            export PIP_FIND_LINKS="$(pwd)/wheels"
+            briefcase build --no-input
+          fi
+
+      - name: Briefcase Package (Create Installer)
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            powershell -Command '$env:PIP_FIND_LINKS="wheels"; briefcase package --no-input'
+          elif [ "${{ matrix.os }}" = "macos-13" ]; then
+            export PIP_FIND_LINKS="$(pwd)/wheels"
+            briefcase package --adhoc-sign --no-input
+          else
+            export PIP_FIND_LINKS="$(pwd)/wheels"
+            briefcase package --no-input
+          fi
+
+      - name: Rename and Prepare Artifact (Unix)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          # Find created package and copy it to a standardized filename
+          file_path=$(ls ${{ matrix.artifact-path }} | head -n 1)
+          cp "$file_path" "${{ matrix.artifact-name }}"
+
+      - name: Rename and Prepare Artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $filePath = Resolve-Path "build/twfathom/windows/msi/*.msi" | Select-Object -ExpandProperty Path -First 1
+          Copy-Item $filePath -Destination "twFathom-Windows.msi"
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: ${{ matrix.artifact-name }}
+
+  release:
+    name: Create GitHub Release
+    needs: package
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: twFathom-Windows.msi
+          path: ./
+
+      - name: Download macOS Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: twFathom-macOS.dmg
+          path: ./
+
+      - name: Download Linux Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: twFathom-Linux.AppImage
+          path: ./
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            twFathom-Windows.msi
+            twFathom-macOS.dmg
+            twFathom-Linux.AppImage
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

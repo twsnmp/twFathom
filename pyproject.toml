@@ -1,0 +1,41 @@
+[project]
+name = "twfathom"
+version = "0.1.0"
+description = "Deeply fathom your data with AI."
+readme = "README.md"
+requires-python = ">=3.8"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+    { name = "twsnmp", email = "twsnmp@example.com" },
+]
+dependencies = [
+    "pywebview==5.1",
+    "paho-mqtt==2.1.0",
+    "httpx==0.28.1",
+    "watchdog==4.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/twsnmp/twFathom"
+
+[tool.briefcase]
+project_name = "twFathom"
+bundle = "com.twsnmp"
+version = "0.1.0"
+
+[tool.briefcase.app.twfathom]
+formal_name = "twFathom"
+description = "Deeply fathom your data with AI."
+sources = ["src/twfathom"]
+
+[tool.briefcase.app.twfathom.macOS]
+requires = [
+    "std-nslog==1.0.3",
+]
+
+[tool.briefcase.app.twfathom.windows]
+requires = []
+
+[tool.briefcase.app.twfathom.linux]
+requires = []
