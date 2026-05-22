@@ -4,7 +4,8 @@ import re
 
 # Keyword sets for classification
 ENV_KEYWORDS = {
-    'temp', 'temperature', 'humidity', 'humid', 'pressure', 'co2', 'soil', 'moisture'
+    'temp', 'temperature', 'humidity', 'humid', 'pressure', 'co2', 'soil', 'moisture',
+    'illu', 'illuminance', 'lux', 'light', '照度'
 }
 
 TRAFFIC_KEYWORDS = {
@@ -17,7 +18,8 @@ ENV_MAPS = {
     'humidity': [re.compile(r'humid(ity)?$', re.I), re.compile(r'^h$', re.I)],
     'pressure': [re.compile(r'press(ure)?$', re.I), re.compile(r'^p$', re.I)],
     'co2': [re.compile(r'co2$', re.I), re.compile(r'carbon$', re.I)],
-    'soil_moisture': [re.compile(r'soil(_moisture)?$', re.I), re.compile(r'moisture$', re.I), re.compile(r'^sm$', re.I)]
+    'soil_moisture': [re.compile(r'soil(_moisture)?$', re.I), re.compile(r'moisture$', re.I), re.compile(r'^sm$', re.I)],
+    'illuminance': [re.compile(r'illu(minance)?$', re.I), re.compile(r'lux$', re.I), re.compile(r'light$', re.I), re.compile(r'^l$', re.I), re.compile(r'照度$', re.I)]
 }
 
 TRAFFIC_MAPS = {

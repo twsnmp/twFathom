@@ -55,9 +55,10 @@ def https_poll_loop(source_id, config, interval, stop_event):
                                         humidity=row.get('humidity'),
                                         pressure=row.get('pressure'),
                                         co2=row.get('co2'),
-                                        soil_moisture=row.get('soil_moisture')
+                                        soil_moisture=row.get('soil_moisture'),
+                                        illuminance=row.get('illuminance')
                                     )
-                                    print(f"  Inserted Environment: Temp={row.get('temperature')}, Humid={row.get('humidity')}")
+                                    print(f"  Inserted Environment: Temp={row.get('temperature')}, Humid={row.get('humidity')}, Lux={row.get('illuminance')}")
                                 elif data_type == 'traffic':
                                     insert_traffic_data(
                                         source_id,
@@ -112,9 +113,10 @@ def file_poll_loop(source_id, config, interval, stop_event):
                                         humidity=row.get('humidity'),
                                         pressure=row.get('pressure'),
                                         co2=row.get('co2'),
-                                        soil_moisture=row.get('soil_moisture')
+                                        soil_moisture=row.get('soil_moisture'),
+                                        illuminance=row.get('illuminance')
                                     )
-                                    print(f"  Inserted Environment: Temp={row.get('temperature')}, Humid={row.get('humidity')}")
+                                    print(f"  Inserted Environment: Temp={row.get('temperature')}, Humid={row.get('humidity')}, Lux={row.get('illuminance')}")
                                 elif data_type == 'traffic':
                                     insert_traffic_data(
                                         source_id,
@@ -188,9 +190,10 @@ def mqtt_listener(source_id, config, stop_event):
                                 humidity=row.get('humidity'),
                                 pressure=row.get('pressure'),
                                 co2=row.get('co2'),
-                                soil_moisture=row.get('soil_moisture')
+                                soil_moisture=row.get('soil_moisture'),
+                                illuminance=row.get('illuminance')
                             )
-                            print(f"  Inserted Environment: Temp={row.get('temperature')}, Humid={row.get('humidity')}, Co2={row.get('co2')}")
+                            print(f"  Inserted Environment: Temp={row.get('temperature')}, Humid={row.get('humidity')}, Lux={row.get('illuminance')}")
                         elif data_type == 'traffic':
                             insert_traffic_data(
                                 source_id,

@@ -46,6 +46,7 @@ def init_db():
         pressure REAL,
         co2 REAL,
         soil_moisture REAL,
+        illuminance REAL,
         FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE
     );
     """)
@@ -76,6 +77,11 @@ def init_db():
         cursor.execute("ALTER TABLE sources ADD COLUMN data_type TEXT NOT NULL DEFAULT 'unknown';")
     if 'active' not in columns:
         cursor.execute("ALTER TABLE sources ADD COLUMN active INTEGER DEFAULT 1;")
+        
+    cursor.execute("PRAGMA table_info(environment_data);")
+    env_columns = [row['name'] for row in cursor.fetchall()]
+    if 'illuminance' not in env_columns:
+        cursor.execute("ALTER TABLE environment_data ADD COLUMN illuminance REAL;")
         
     conn.commit()
     conn.close()
@@ -139,15 +145,15 @@ def delete_source(source_id):
     conn.close()
 
 # Data Insertion
-def insert_environment_data(source_id, temperature=None, humidity=None, pressure=None, co2=None, soil_moisture=None, timestamp=None):
+def insert_environment_data(source_id, temperature=None, humidity=None, pressure=None, co2=None, soil_moisture=None, illuminance=None, timestamp=None):
     if timestamp is None:
         timestamp = datetime.now().isoformat()
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-    INSERT INTO environment_data (source_id, timestamp, temperature, humidity, pressure, co2, soil_moisture)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (source_id, timestamp, temperature, humidity, pressure, co2, soil_moisture))
+    INSERT INTO environment_data (source_id, timestamp, temperature, humidity, pressure, co2, soil_moisture, illuminance)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (source_id, timestamp, temperature, humidity, pressure, co2, soil_moisture, illuminance))
     conn.commit()
     conn.close()
 

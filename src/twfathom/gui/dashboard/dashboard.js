@@ -108,15 +108,171 @@ function initChart(type, data) {
     ];
     
     if (type === 'environment') {
-        const temps = data.map(d => d.temperature);
-        const humids = data.map(d => d.humidity);
-        const co2s = data.map(d => d.co2);
-        
+        const ENV_FIELDS = {
+            temperature: {
+                name: '温度 (°C)',
+                color: '#ef4444',
+                areaColor: 'rgba(239, 68, 68, 0.2)'
+            },
+            humidity: {
+                name: '湿度 (%)',
+                color: '#00d2ff',
+                areaColor: 'rgba(0, 210, 255, 0.2)'
+            },
+            soil_moisture: {
+                name: '土壌水分 (%)',
+                color: '#00f5d4',
+                areaColor: 'rgba(0, 245, 212, 0.2)'
+            },
+            pressure: {
+                name: '気圧 (hPa)',
+                color: '#10b981',
+                areaColor: 'rgba(16, 185, 129, 0.2)'
+            },
+            co2: {
+                name: 'CO2 (ppm)',
+                color: '#f59e0b',
+                areaColor: 'rgba(245, 158, 11, 0.2)'
+            },
+            illuminance: {
+                name: '照度 (lx)',
+                color: '#bd00ff',
+                areaColor: 'rgba(189, 0, 255, 0.2)'
+            }
+        };
+
+        const hasData = (key) => data.some(d => d[key] !== null && d[key] !== undefined);
+        const otherKeys = ['soil_moisture', 'pressure', 'co2', 'illuminance'];
+        const activeOtherKey = otherKeys.find(hasData);
+
+        let legendData = [];
+        let yAxisConfig = [];
+        let seriesConfig = [];
+
+        if (!activeOtherKey) {
+            // Case 1: Only Temperature and Humidity (or fewer/no others)
+            legendData = [ENV_FIELDS.temperature.name, ENV_FIELDS.humidity.name];
+            
+            yAxisConfig = [
+                {
+                    type: 'value',
+                    name: '温度',
+                    axisLabel: { color: '#9ca3af' },
+                    splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } }
+                },
+                {
+                    type: 'value',
+                    name: '湿度',
+                    axisLabel: { color: '#9ca3af' },
+                    splitLine: { show: false }
+                }
+            ];
+
+            seriesConfig = [
+                {
+                    name: ENV_FIELDS.temperature.name,
+                    type: 'line',
+                    smooth: true,
+                    data: data.map(d => d.temperature),
+                    itemStyle: { color: ENV_FIELDS.temperature.color },
+                    lineStyle: { width: 3 },
+                    yAxisIndex: 0,
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: ENV_FIELDS.temperature.areaColor },
+                            { offset: 1, color: 'rgba(239, 68, 68, 0)' }
+                        ])
+                    }
+                },
+                {
+                    name: ENV_FIELDS.humidity.name,
+                    type: 'line',
+                    smooth: true,
+                    data: data.map(d => d.humidity),
+                    itemStyle: { color: ENV_FIELDS.humidity.color },
+                    lineStyle: { width: 3 },
+                    yAxisIndex: 1,
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: ENV_FIELDS.humidity.areaColor },
+                            { offset: 1, color: 'rgba(0, 210, 255, 0)' }
+                        ])
+                    }
+                }
+            ];
+        } else {
+            // Case 2: Other data types exist (Soil Moisture, Atmospheric Pressure, CO2, or Illuminance)
+            legendData = [ENV_FIELDS.temperature.name, ENV_FIELDS.humidity.name, ENV_FIELDS[activeOtherKey].name];
+
+            yAxisConfig = [
+                {
+                    type: 'value',
+                    name: '温湿度',
+                    axisLabel: { color: '#9ca3af' },
+                    splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } }
+                },
+                {
+                    type: 'value',
+                    name: ENV_FIELDS[activeOtherKey].name.split(' ')[0], // Name without unit for the axis title
+                    axisLabel: { color: '#9ca3af' },
+                    splitLine: { show: false }
+                }
+            ];
+
+            seriesConfig = [
+                {
+                    name: ENV_FIELDS.temperature.name,
+                    type: 'line',
+                    smooth: true,
+                    data: data.map(d => d.temperature),
+                    itemStyle: { color: ENV_FIELDS.temperature.color },
+                    lineStyle: { width: 3 },
+                    yAxisIndex: 0,
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: ENV_FIELDS.temperature.areaColor },
+                            { offset: 1, color: 'rgba(239, 68, 68, 0)' }
+                        ])
+                    }
+                },
+                {
+                    name: ENV_FIELDS.humidity.name,
+                    type: 'line',
+                    smooth: true,
+                    data: data.map(d => d.humidity),
+                    itemStyle: { color: ENV_FIELDS.humidity.color },
+                    lineStyle: { width: 3 },
+                    yAxisIndex: 0,
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: ENV_FIELDS.humidity.areaColor },
+                            { offset: 1, color: 'rgba(0, 210, 255, 0)' }
+                        ])
+                    }
+                },
+                {
+                    name: ENV_FIELDS[activeOtherKey].name,
+                    type: 'line',
+                    smooth: true,
+                    data: data.map(d => d[activeOtherKey]),
+                    itemStyle: { color: ENV_FIELDS[activeOtherKey].color },
+                    lineStyle: { width: 3 },
+                    yAxisIndex: 1,
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: ENV_FIELDS[activeOtherKey].areaColor },
+                            { offset: 1, color: 'rgba(0, 0, 0, 0)' }
+                        ])
+                    }
+                }
+            ];
+        }
+
         option = {
             backgroundColor: 'transparent',
             tooltip: baseTooltip,
             legend: {
-                data: ['温度 (°C)', '湿度 (%)', 'CO2 (ppm)'],
+                data: legendData,
                 textStyle: { color: '#9ca3af', fontFamily: 'Inter' }
             },
             grid: baseGrid,
@@ -128,65 +284,8 @@ function initChart(type, data) {
                 axisLabel: { color: '#9ca3af' },
                 axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.1)' } }
             },
-            yAxis: [
-                {
-                    type: 'value',
-                    name: '温湿度',
-                    axisLabel: { color: '#9ca3af' },
-                    splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } }
-                },
-                {
-                    type: 'value',
-                    name: 'CO2',
-                    axisLabel: { color: '#9ca3af' },
-                    splitLine: { show: false }
-                }
-            ],
-            series: [
-                {
-                    name: '温度 (°C)',
-                    type: 'line',
-                    smooth: true,
-                    data: temps,
-                    itemStyle: { color: '#ef4444' },
-                    lineStyle: { width: 3 },
-                    areaStyle: {
-                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                            { offset: 0, color: 'rgba(239, 68, 68, 0.2)' },
-                            { offset: 1, color: 'rgba(239, 68, 68, 0)' }
-                        ])
-                    }
-                },
-                {
-                    name: '湿度 (%)',
-                    type: 'line',
-                    smooth: true,
-                    data: humids,
-                    itemStyle: { color: '#00d2ff' },
-                    lineStyle: { width: 3 },
-                    areaStyle: {
-                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                            { offset: 0, color: 'rgba(0, 210, 255, 0.2)' },
-                            { offset: 1, color: 'rgba(0, 210, 255, 0)' }
-                        ])
-                    }
-                },
-                {
-                    name: 'CO2 (ppm)',
-                    type: 'line',
-                    smooth: true,
-                    yAxisIndex: 1,
-                    data: co2s,
-                    itemStyle: { color: '#f59e0b' },
-                    lineStyle: { width: 3 },
-                    areaStyle: {
-                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                            { offset: 0, color: 'rgba(245, 158, 11, 0.2)' },
-                            { offset: 1, color: 'rgba(245, 158, 11, 0)' }
-                        ])
-                    }
-                }
-            ]
+            yAxis: yAxisConfig,
+            series: seriesConfig
         };
     } else if (type === 'traffic') {
         const rxPPS = data.map(d => d.rx_pps);
@@ -294,9 +393,10 @@ function updateKpiCards(type, latestData) {
         const fields = [
             { label: '温度', val: latestData.temperature, unit: '°C', color: 'var(--color-danger)' },
             { label: '湿度', val: latestData.humidity, unit: '%', color: 'var(--color-primary)' },
+            { label: '土壌水分', val: latestData.soil_moisture, unit: '%', color: '#00f5d4' },
             { label: '大気圧', val: latestData.pressure, unit: 'hPa', color: 'var(--color-success)' },
             { label: 'CO2 濃度', val: latestData.co2, unit: 'ppm', color: 'var(--color-warning)' },
-            { label: '土壌水分', val: latestData.soil_moisture, unit: '%', color: '#00f5d4' }
+            { label: '照度', val: latestData.illuminance, unit: 'lx', color: '#bd00ff' }
         ];
         
         fields.forEach(f => {
