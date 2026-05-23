@@ -27,6 +27,7 @@ version = "0.1.0"
 [tool.briefcase.app.twfathom]
 formal_name = "twFathom"
 description = "Deeply fathom your data with AI."
+long_description = "Deeply fathom your data with AI."
 icon = "src/twfathom/resources/icon"
 sources = ["src/twfathom"]
 requires = [
