@@ -25,11 +25,6 @@ jobs:
             artifact-name: "twFathom-Windows.msi"
             python-version: '3.11'
             briefcase-platform: 'windows'
-          - os: macos-13 # Standard intel/arm universal macOS runner
-            artifact-path: "dist/*.dmg"
-            artifact-name: "twFathom-macOS.dmg"
-            python-version: '3.11'
-            briefcase-platform: 'macos'
           - os: ubuntu-22.04
             artifact-path: "dist/*.deb"
             artifact-name: "twFathom-Linux.deb"
@@ -108,9 +103,7 @@ jobs:
         shell: bash
         run: |
           export PIP_FIND_LINKS="$(pwd)/wheels"
-          if [ "${{ matrix.os }}" = "macos-13" ]; then
-            python -m briefcase package ${{ matrix.briefcase-platform }} --adhoc-sign --no-input
-          elif [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
+          if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
             python3 -m briefcase package ${{ matrix.briefcase-platform }} --no-input
           else
             python -m briefcase package ${{ matrix.briefcase-platform }} --no-input
@@ -144,12 +137,6 @@ jobs:
           name: twFathom-Windows.msi
           path: ./
 
-      - name: Download macOS Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: twFathom-macOS.dmg
-          path: ./
-
       - name: Download Linux Artifact
         uses: actions/download-artifact@v4
         with:
@@ -161,7 +148,6 @@ jobs:
         with:
           files: |
             twFathom-Windows.msi
-            twFathom-macOS.dmg
             twFathom-Linux.deb
           draft: false
           prerelease: false
