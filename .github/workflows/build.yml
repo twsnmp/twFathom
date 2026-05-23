@@ -25,19 +25,16 @@ jobs:
             artifact-name: "twFathom-Windows.msi"
             python-version: '3.11'
             briefcase-platform: 'windows'
-            briefcase-format: 'msi'
           - os: macos-13 # Standard intel/arm universal macOS runner
             artifact-path: "dist/*.dmg"
             artifact-name: "twFathom-macOS.dmg"
             python-version: '3.11'
             briefcase-platform: 'macos'
-            briefcase-format: 'app'
           - os: ubuntu-22.04
-            artifact-path: "dist/*.AppImage"
-            artifact-name: "twFathom-Linux.AppImage"
+            artifact-path: "dist/*.deb"
+            artifact-name: "twFathom-Linux.deb"
             python-version: '3.10.12'
             briefcase-platform: 'linux'
-            briefcase-format: 'appimage'
 
     steps:
       - name: Checkout Code
@@ -92,9 +89,9 @@ jobs:
         run: |
           export PIP_FIND_LINKS="$(pwd)/wheels"
           if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
-            python3 -m briefcase create ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-input
+            python3 -m briefcase create ${{ matrix.briefcase-platform }} --no-input
           else
-            python -m briefcase create ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-input
+            python -m briefcase create ${{ matrix.briefcase-platform }} --no-input
           fi
  
       - name: Briefcase Build
@@ -102,9 +99,9 @@ jobs:
         run: |
           export PIP_FIND_LINKS="$(pwd)/wheels"
           if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
-            python3 -m briefcase build ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-input
+            python3 -m briefcase build ${{ matrix.briefcase-platform }} --no-input
           else
-            python -m briefcase build ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-input
+            python -m briefcase build ${{ matrix.briefcase-platform }} --no-input
           fi
  
       - name: Briefcase Package (Create Installer)
@@ -112,11 +109,11 @@ jobs:
         run: |
           export PIP_FIND_LINKS="$(pwd)/wheels"
           if [ "${{ matrix.os }}" = "macos-13" ]; then
-            python -m briefcase package ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --adhoc-sign --no-input
+            python -m briefcase package ${{ matrix.briefcase-platform }} --adhoc-sign --no-input
           elif [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
-            python3 -m briefcase package ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-input
+            python3 -m briefcase package ${{ matrix.briefcase-platform }} --no-input
           else
-            python -m briefcase package ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-input
+            python -m briefcase package ${{ matrix.briefcase-platform }} --no-input
           fi
 
       - name: Rename and Prepare Artifact
@@ -156,7 +153,7 @@ jobs:
       - name: Download Linux Artifact
         uses: actions/download-artifact@v4
         with:
-          name: twFathom-Linux.AppImage
+          name: twFathom-Linux.deb
           path: ./
 
       - name: Create Release
@@ -165,7 +162,7 @@ jobs:
           files: |
             twFathom-Windows.msi
             twFathom-macOS.dmg
-            twFathom-Linux.AppImage
+            twFathom-Linux.deb
           draft: false
           prerelease: false
         env:
