@@ -16,6 +16,8 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      PIP_FIND_LINKS: ${{ github.workspace }}/wheels
     strategy:
       fail-fast: false
       matrix:
@@ -84,31 +86,28 @@ jobs:
       - name: Briefcase Create (Scaffold Build Environment)
         shell: bash
         run: |
-          export PIP_FIND_LINKS="$(pwd)/wheels"
           if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
-            python3 -m briefcase create ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-input
+            python3 -m briefcase create ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-docker --no-input
           else
-            python -m briefcase create ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-input
+            powershell -Command "python -m briefcase create ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-input"
           fi
  
       - name: Briefcase Build
         shell: bash
         run: |
-          export PIP_FIND_LINKS="$(pwd)/wheels"
           if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
-            python3 -m briefcase build ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-input
+            python3 -m briefcase build ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-docker --no-input
           else
-            python -m briefcase build ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-input
+            powershell -Command "python -m briefcase build ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-input"
           fi
  
       - name: Briefcase Package (Create Installer)
         shell: bash
         run: |
-          export PIP_FIND_LINKS="$(pwd)/wheels"
           if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
-            python3 -m briefcase package ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-input
+            python3 -m briefcase package ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-docker --no-input
           else
-            python -m briefcase package ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-input
+            powershell -Command "python -m briefcase package ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-input"
           fi
 
       - name: Rename and Prepare Artifact
