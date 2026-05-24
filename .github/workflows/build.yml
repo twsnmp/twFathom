@@ -13,8 +13,9 @@ jobs:
   package-windows:
     name: Package App (Windows)
     runs-on: windows-latest
-    env:
-      PIP_FIND_LINKS: ${{ github.workspace }}/wheels
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout Code
@@ -33,25 +34,28 @@ jobs:
 
       - name: Pre-build Dependency Wheels (Avoid proxy-tools blocker)
         run: |
-          mkdir wheels
+          mkdir -p wheels
           python -m pip wheel proxy-tools --wheel-dir=wheels
 
       - name: Briefcase Create (Scaffold Build Environment)
         run: |
-          python -m briefcase create windows msi --no-input
+          export PIP_FIND_LINKS="$(pwd)/wheels"
+          python -m briefcase create --no-input
 
       - name: Briefcase Build
         run: |
-          python -m briefcase build windows msi --no-input
+          export PIP_FIND_LINKS="$(pwd)/wheels"
+          python -m briefcase build --no-input
 
       - name: Briefcase Package (Create Installer)
         run: |
-          python -m briefcase package windows msi --no-input
+          export PIP_FIND_LINKS="$(pwd)/wheels"
+          python -m briefcase package --no-input
 
       - name: Rename and Prepare Artifact
         run: |
-          $filePath = Resolve-Path "dist/*.msi" | Select-Object -ExpandProperty Path -First 1
-          Copy-Item $filePath -Destination "twFathom-Windows.msi"
+          file_path=$(ls build/twfathom/windows/msi/*.msi | head -n 1)
+          cp "$file_path" "twFathom-Windows.msi"
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
@@ -62,8 +66,9 @@ jobs:
   package-linux:
     name: Package App (Linux)
     runs-on: ubuntu-22.04
-    env:
-      PIP_FIND_LINKS: ${{ github.workspace }}/wheels
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout Code
@@ -97,14 +102,17 @@ jobs:
 
       - name: Briefcase Create (Scaffold Build Environment)
         run: |
+          export PIP_FIND_LINKS="$(pwd)/wheels"
           python3 -m briefcase create linux appimage --no-docker --no-input
 
       - name: Briefcase Build
         run: |
+          export PIP_FIND_LINKS="$(pwd)/wheels"
           python3 -m briefcase build linux appimage --no-docker --no-input
 
       - name: Briefcase Package (Create Installer)
         run: |
+          export PIP_FIND_LINKS="$(pwd)/wheels"
           python3 -m briefcase package linux appimage --no-docker --no-input
 
       - name: Rename and Prepare Artifact
