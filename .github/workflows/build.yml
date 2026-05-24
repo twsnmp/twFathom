@@ -55,7 +55,7 @@ jobs:
       - name: Rename and Prepare Artifact
         shell: pwsh
         run: |
-          $filePath = Resolve-Path "build/twfathom/windows/msi/*.msi" | Select-Object -ExpandProperty Path -First 1
+          $filePath = Resolve-Path "dist/*.msi" | Select-Object -ExpandProperty Path -First 1
           Copy-Item $filePath -Destination "twFathom-Windows.msi"
 
       - name: Upload Build Artifacts
