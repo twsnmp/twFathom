@@ -40,8 +40,8 @@ def main():
         
     main_window.events.closed += on_closed
     
-    # Start pywebview with devtools enabled
-    webview.start(debug=True)
+    # Start pywebview
+    webview.start(debug=False)
 
 if __name__ == '__main__':
     main()
