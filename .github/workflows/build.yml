@@ -10,44 +10,66 @@ permissions:
   contents: write
 
 jobs:
-  package:
-    name: Package App (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        shell: bash
+  package-windows:
+    name: Package App (Windows)
+    runs-on: windows-latest
     env:
       PIP_FIND_LINKS: ${{ github.workspace }}/wheels
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            artifact-path: "dist/*.msi"
-            artifact-name: "twFathom-Windows.msi"
-            python-version: '3.11'
-            briefcase-platform: 'windows'
-            briefcase-format: 'msi'
-          - os: ubuntu-22.04
-            artifact-path: "dist/*.AppImage"
-            artifact-name: "twFathom-Linux.AppImage"
-            python-version: '3.10.12'
-            briefcase-platform: 'linux'
-            briefcase-format: 'appimage'
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up Python
-        if: matrix.os != 'ubuntu-22.04'
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.11'
           cache: 'pip'
 
+      - name: Install Briefcase
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install briefcase wheel
+
+      - name: Pre-build Dependency Wheels (Avoid proxy-tools blocker)
+        run: |
+          mkdir wheels
+          python -m pip wheel proxy-tools --wheel-dir=wheels
+
+      - name: Briefcase Create (Scaffold Build Environment)
+        run: |
+          python -m briefcase create windows msi --no-input
+
+      - name: Briefcase Build
+        run: |
+          python -m briefcase build windows msi --no-input
+
+      - name: Briefcase Package (Create Installer)
+        run: |
+          python -m briefcase package windows msi --no-input
+
+      - name: Rename and Prepare Artifact
+        run: |
+          $filePath = Resolve-Path "dist/*.msi" | Select-Object -ExpandProperty Path -First 1
+          Copy-Item $filePath -Destination "twFathom-Windows.msi"
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: twFathom-Windows.msi
+          path: twFathom-Windows.msi
+
+  package-linux:
+    name: Package App (Linux)
+    runs-on: ubuntu-22.04
+    env:
+      PIP_FIND_LINKS: ${{ github.workspace }}/wheels
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       - name: Install System Dependencies (Linux Only)
-        if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -65,67 +87,40 @@ jobs:
 
       - name: Install Briefcase
         run: |
-          if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
-            python3 -m pip install --upgrade pip
-            python3 -m pip install --break-system-packages briefcase wheel
-          else
-            python -m pip install --upgrade pip
-            python -m pip install briefcase wheel
-          fi
+          python3 -m pip install --upgrade pip
+          python3 -m pip install --break-system-packages briefcase wheel
 
       - name: Pre-build Dependency Wheels (Avoid proxy-tools blocker)
-        shell: bash
         run: |
           mkdir -p wheels
-          if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
-            python3 -m pip wheel proxy-tools --wheel-dir=wheels
-          else
-            python -m pip wheel proxy-tools --wheel-dir=wheels
-          fi
+          python3 -m pip wheel proxy-tools --wheel-dir=wheels
 
       - name: Briefcase Create (Scaffold Build Environment)
-        shell: bash
         run: |
-          if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
-            python3 -m briefcase create ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-docker --no-input
-          else
-            powershell -Command "python -m briefcase create ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-input"
-          fi
- 
+          python3 -m briefcase create linux appimage --no-docker --no-input
+
       - name: Briefcase Build
-        shell: bash
         run: |
-          if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
-            python3 -m briefcase build ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-docker --no-input
-          else
-            powershell -Command "python -m briefcase build ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-input"
-          fi
- 
+          python3 -m briefcase build linux appimage --no-docker --no-input
+
       - name: Briefcase Package (Create Installer)
-        shell: bash
         run: |
-          if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
-            python3 -m briefcase package ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-docker --no-input
-          else
-            powershell -Command "python -m briefcase package ${{ matrix.briefcase-platform }} ${{ matrix.briefcase-format }} --no-input"
-          fi
+          python3 -m briefcase package linux appimage --no-docker --no-input
 
       - name: Rename and Prepare Artifact
-        shell: bash
         run: |
-          # Find created package in dist/ and copy it to a standardized filename
-          file_path=$(ls ${{ matrix.artifact-path }} | head -n 1)
-          cp "$file_path" "${{ matrix.artifact-name }}"
+          file_path=$(ls dist/*.AppImage | head -n 1)
+          cp "$file_path" "twFathom-Linux.AppImage"
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact-name }}
-          path: ${{ matrix.artifact-name }}
+          name: twFathom-Linux.AppImage
+          path: twFathom-Linux.AppImage
 
   release:
     name: Create GitHub Release
-    needs: package
+    needs: [package-windows, package-linux]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
