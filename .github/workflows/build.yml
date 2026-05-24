@@ -53,9 +53,10 @@ jobs:
           python -m briefcase package --no-input
 
       - name: Rename and Prepare Artifact
+        shell: pwsh
         run: |
-          file_path=$(ls build/twfathom/windows/msi/*.msi | head -n 1)
-          cp "$file_path" "twFathom-Windows.msi"
+          $filePath = Resolve-Path "build/twfathom/windows/msi/*.msi" | Select-Object -ExpandProperty Path -First 1
+          Copy-Item $filePath -Destination "twFathom-Windows.msi"
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
