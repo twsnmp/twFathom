@@ -47,4 +47,7 @@ requires = [
 requires = []
 
 [tool.briefcase.app.twfathom.linux]
-requires = []
+requires = [
+    "pygobject==3.48.2",
+    "pycairo==1.26.0",
+]
