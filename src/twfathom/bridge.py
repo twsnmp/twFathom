@@ -69,10 +69,10 @@ class Bridge:
             return new_active
         return None
 
-    def get_environment_history(self, source_id, limit=100):
+    def get_environment_history(self, source_id, limit=-1):
         return db.get_environment_history(source_id, limit)
 
-    def get_traffic_history(self, source_id, limit=100):
+    def get_traffic_history(self, source_id, limit=-1):
         return db.get_traffic_history(source_id, limit)
 
     def open_dashboard(self, source_id):

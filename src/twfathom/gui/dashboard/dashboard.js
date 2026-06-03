@@ -25,20 +25,64 @@ function initChart(type, data) {
     const chartDom = document.getElementById('main-chart');
     if (!chartDom) return;
     
+    const controlsDom = document.getElementById('chart-controls');
+    if (controlsDom) controlsDom.innerHTML = '';
+    
+    let savedZoom = null;
+    let savedLegend = {};
+    
+    // Load from localStorage
+    try {
+        const savedStr = localStorage.getItem(`legend_selected_${sourceId}_${dataType}`);
+        if (savedStr) {
+            savedLegend = JSON.parse(savedStr);
+        }
+    } catch (e) {
+        console.error("Error loading legend selection:", e);
+    }
+    
+    if (chart) {
+        const currentOption = chart.getOption();
+        if (currentOption) {
+            // Maintain runtime legend selection
+            if (currentOption.legend && currentOption.legend[0] && currentOption.legend[0].selected) {
+                savedLegend = Object.assign({}, savedLegend, currentOption.legend[0].selected);
+            }
+            // Maintain runtime zoom level
+            if (currentOption.dataZoom && currentOption.dataZoom[0]) {
+                savedZoom = {
+                    start: currentOption.dataZoom[0].start,
+                    end: currentOption.dataZoom[0].end
+                };
+            }
+        }
+    }
+
     if (!chart) {
         chart = echarts.init(chartDom);
         // Make responsive
         window.addEventListener('resize', () => {
             if (chart) chart.resize();
         });
+        
+        // Listen to legend selection changes and persist them
+        chart.on('legendselectchanged', (params) => {
+            try {
+                localStorage.setItem(`legend_selected_${sourceId}_${dataType}`, JSON.stringify(params.selected));
+            } catch (e) {
+                console.error("Error saving legend selection:", e);
+            }
+        });
     }
     
     let option = {};
     const timestamps = data.map(d => {
-        // Parse ISO timestamp to readable time
+        // Parse ISO timestamp to readable date and time
         try {
             const dt = new Date(d.timestamp);
-            return dt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const dateStr = dt.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
+            const timeStr = dt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            return `${dateStr} ${timeStr}`;
         } catch(e) {
             return d.timestamp;
         }
@@ -60,20 +104,14 @@ function initChart(type, data) {
         axisPointer: { type: 'cross' }
     };
     
-    // Dynamically focus on the latest 30 points if the history becomes long,
-    // while still letting the user zoom out/pan backwards.
-    let startZoom = 0;
-    if (data.length > 30) {
-        startZoom = Math.round((1 - 30 / data.length) * 100);
-    }
-    
+    // Zoom should cover all data by default (0-100), unless zoom state was saved during redraws
     const baseDataZoom = [
         {
             type: 'slider',
             show: true,
             xAxisIndex: [0],
-            start: startZoom,
-            end: 100,
+            start: savedZoom ? savedZoom.start : 0,
+            end: savedZoom ? savedZoom.end : 100,
             height: 16,
             bottom: 12,
             borderColor: 'rgba(255, 255, 255, 0.08)',
@@ -100,8 +138,8 @@ function initChart(type, data) {
         {
             type: 'inside',
             xAxisIndex: [0],
-            start: startZoom,
-            end: 100,
+            start: savedZoom ? savedZoom.start : 0,
+            end: savedZoom ? savedZoom.end : 100,
             zoomOnMouseWheel: true,
             moveOnMouseMove: true
         }
@@ -141,9 +179,40 @@ function initChart(type, data) {
             }
         };
 
-        const hasData = (key) => data.some(d => d[key] !== null && d[key] !== undefined);
         const otherKeys = ['soil_moisture', 'pressure', 'co2', 'illuminance'];
-        const activeOtherKey = otherKeys.find(hasData);
+        const availableKeys = otherKeys.filter(key => data.some(d => d[key] !== null && d[key] !== undefined));
+        
+        let activeOtherKey = localStorage.getItem(`active_right_axis_${sourceId}`);
+        if (!activeOtherKey || !availableKeys.includes(activeOtherKey)) {
+            activeOtherKey = availableKeys[0] || null;
+        }
+
+        // Render pill selector in header
+        const controlsDom = document.getElementById('chart-controls');
+        if (controlsDom) {
+            if (availableKeys.length > 1) {
+                let pillsHtml = '<div class="pill-selector">';
+                availableKeys.forEach(key => {
+                    const isActive = (key === activeOtherKey);
+                    const label = ENV_FIELDS[key].name.split(' ')[0];
+                    pillsHtml += `<button class="pill-btn${isActive ? ' active' : ''}" data-key="${key}">${label}</button>`;
+                });
+                pillsHtml += '</div>';
+                controlsDom.innerHTML = pillsHtml;
+                
+                // Add event listeners to buttons
+                controlsDom.querySelectorAll('.pill-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const selectedKey = e.target.getAttribute('data-key');
+                        localStorage.setItem(`active_right_axis_${sourceId}`, selectedKey);
+                        lastDataSignature = ''; // Reset signature to force redraw
+                        pollDashboard();
+                    });
+                });
+            } else {
+                controlsDom.innerHTML = '';
+            }
+        }
 
         let legendData = [];
         let yAxisConfig = [];
@@ -220,6 +289,7 @@ function initChart(type, data) {
                 {
                     type: 'value',
                     name: ENV_FIELDS[activeOtherKey].name.split(' ')[0], // Name without unit for the axis title
+                    scale: true,
                     axisLabel: { color: '#9ca3af' },
                     splitLine: { show: false }
                 }
@@ -288,6 +358,7 @@ function initChart(type, data) {
             tooltip: baseTooltip,
             legend: {
                 data: legendData,
+                selected: savedLegend,
                 textStyle: { color: '#9ca3af', fontFamily: 'Inter' }
             },
             grid: baseGrid,
@@ -296,7 +367,12 @@ function initChart(type, data) {
                 type: 'category',
                 boundaryGap: data.length <= 1,
                 data: timestamps,
-                axisLabel: { color: '#9ca3af' },
+                axisLabel: { 
+                    color: '#9ca3af',
+                    formatter: function(value) {
+                        return value && value.includes(' ') ? value.split(' ')[1] : value;
+                    }
+                },
                 axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.1)' } }
             },
             yAxis: yAxisConfig,
@@ -313,6 +389,7 @@ function initChart(type, data) {
             tooltip: baseTooltip,
             legend: {
                 data: ['受信 (pps)', '送信 (pps)', '受信速度 (bps)', '送信速度 (bps)'],
+                selected: savedLegend,
                 textStyle: { color: '#9ca3af', fontFamily: 'Inter' }
             },
             grid: baseGrid,
@@ -321,7 +398,12 @@ function initChart(type, data) {
                 type: 'category',
                 boundaryGap: data.length <= 1,
                 data: timestamps,
-                axisLabel: { color: '#9ca3af' },
+                axisLabel: { 
+                    color: '#9ca3af',
+                    formatter: function(value) {
+                        return value && value.includes(' ') ? value.split(' ')[1] : value;
+                    }
+                },
                 axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.1)' } }
             },
             yAxis: [
@@ -495,7 +577,7 @@ async function pollDashboard() {
         
         if (dataType === 'environment') {
             document.getElementById('chart-main-title').textContent = '環境センサー 時系列データ';
-            const history = await window.pywebview.api.get_environment_history(sourceId, 100);
+            const history = await window.pywebview.api.get_environment_history(sourceId, -1);
             
             const signature = history.length > 0 ? `${history.length}_${history[history.length - 1].timestamp}` : 'empty';
             if (signature !== lastDataSignature) {
@@ -505,7 +587,7 @@ async function pollDashboard() {
             }
         } else if (dataType === 'traffic') {
             document.getElementById('chart-main-title').textContent = 'ネットワークトラフィック 時系列データ';
-            const history = await window.pywebview.api.get_traffic_history(sourceId, 100);
+            const history = await window.pywebview.api.get_traffic_history(sourceId, -1);
             
             const signature = history.length > 0 ? `${history.length}_${history[history.length - 1].timestamp}` : 'empty';
             if (signature !== lastDataSignature) {

@@ -173,12 +173,19 @@ def insert_traffic_data(source_id, rx_pps=None, tx_pps=None, rx_bps=None, tx_bps
 def get_environment_history(source_id, limit=100):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-    SELECT * FROM environment_data
-    WHERE source_id = ?
-    ORDER BY timestamp DESC
-    LIMIT ?
-    """, (source_id, limit))
+    if limit is None or limit <= 0:
+        cursor.execute("""
+        SELECT * FROM environment_data
+        WHERE source_id = ?
+        ORDER BY timestamp DESC
+        """, (source_id,))
+    else:
+        cursor.execute("""
+        SELECT * FROM environment_data
+        WHERE source_id = ?
+        ORDER BY timestamp DESC
+        LIMIT ?
+        """, (source_id, limit))
     rows = cursor.fetchall()
     conn.close()
     return [dict(r) for r in reversed(rows)]
@@ -186,12 +193,19 @@ def get_environment_history(source_id, limit=100):
 def get_traffic_history(source_id, limit=100):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-    SELECT * FROM traffic_data
-    WHERE source_id = ?
-    ORDER BY timestamp DESC
-    LIMIT ?
-    """, (source_id, limit))
+    if limit is None or limit <= 0:
+        cursor.execute("""
+        SELECT * FROM traffic_data
+        WHERE source_id = ?
+        ORDER BY timestamp DESC
+        """, (source_id,))
+    else:
+        cursor.execute("""
+        SELECT * FROM traffic_data
+        WHERE source_id = ?
+        ORDER BY timestamp DESC
+        LIMIT ?
+        """, (source_id, limit))
     rows = cursor.fetchall()
     conn.close()
     return [dict(r) for r in reversed(rows)]
