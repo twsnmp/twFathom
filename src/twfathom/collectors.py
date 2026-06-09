@@ -6,6 +6,9 @@ import paho.mqtt.client as mqtt
 from .db import (
     insert_environment_data, 
     insert_traffic_data, 
+    insert_cpu_mem_disk_data,
+    insert_process_load_data,
+    insert_network_speed_data,
     get_source, 
     update_source,
     get_sources
@@ -37,7 +40,8 @@ def https_poll_loop(source_id, config, interval, stop_event):
                     raw_data = resp.text
                     source = get_source(source_id)
                     if source:
-                        data_type, mapped_rows = auto_parse_and_map(raw_data)
+                        expected_type = source.get('data_type', 'unknown')
+                        data_type, mapped_rows = auto_parse_and_map(raw_data, expected_type=expected_type)
                         print(f"[HTTPS Collector {source_id}] Parsed type: {data_type}, rows found: {len(mapped_rows) if mapped_rows else 0}")
                         if data_type != 'unknown' and mapped_rows:
                             if source['data_type'] == 'unknown':
@@ -70,6 +74,33 @@ def https_poll_loop(source_id, config, interval, stop_event):
                                         timestamp=row.get('timestamp')
                                     )
                                     print(f"  Inserted Traffic: RxBps={row.get('rx_bps')}, TxBps={row.get('tx_bps')}")
+                                elif data_type == 'cpu_mem_disk':
+                                    insert_cpu_mem_disk_data(
+                                        source_id,
+                                        cpu=row.get('cpu'),
+                                        memory=row.get('memory'),
+                                        disk=row.get('disk'),
+                                        timestamp=row.get('timestamp')
+                                    )
+                                    print(f"  Inserted Resource: CPU={row.get('cpu')}, Mem={row.get('memory')}, Disk={row.get('disk')}")
+                                elif data_type == 'process_load':
+                                    insert_process_load_data(
+                                        source_id,
+                                        process=row.get('process'),
+                                        load=row.get('load'),
+                                        timestamp=row.get('timestamp')
+                                    )
+                                    print(f"  Inserted Load: Process={row.get('process')}, Load={row.get('load')}")
+                                elif data_type == 'network_speed':
+                                    insert_network_speed_data(
+                                        source_id,
+                                        sent=row.get('sent'),
+                                        recv=row.get('recv'),
+                                        tx_speed=row.get('tx_speed'),
+                                        rx_speed=row.get('rx_speed'),
+                                        timestamp=row.get('timestamp')
+                                    )
+                                    print(f"  Inserted Speed: TxSpeed={row.get('tx_speed')}, RxSpeed={row.get('rx_speed')}")
         except Exception as e:
             print(f"[HTTPS Collector {source_id}] Error polling source: {e}")
             
@@ -97,7 +128,8 @@ def file_poll_loop(source_id, config, interval, stop_event):
                     
                     source = get_source(source_id)
                     if source:
-                        data_type, mapped_rows = auto_parse_and_map(raw_data)
+                        expected_type = source.get('data_type', 'unknown')
+                        data_type, mapped_rows = auto_parse_and_map(raw_data, expected_type=expected_type)
                         print(f"[File Collector {source_id}] Parsed type: {data_type}, rows found: {len(mapped_rows) if mapped_rows else 0}")
                         if data_type != 'unknown' and mapped_rows:
                             if source['data_type'] == 'unknown':
@@ -130,6 +162,33 @@ def file_poll_loop(source_id, config, interval, stop_event):
                                         timestamp=row.get('timestamp')
                                     )
                                     print(f"  Inserted Traffic: RxBps={row.get('rx_bps')}, TxBps={row.get('tx_bps')}")
+                                elif data_type == 'cpu_mem_disk':
+                                    insert_cpu_mem_disk_data(
+                                        source_id,
+                                        cpu=row.get('cpu'),
+                                        memory=row.get('memory'),
+                                        disk=row.get('disk'),
+                                        timestamp=row.get('timestamp')
+                                    )
+                                    print(f"  Inserted Resource: CPU={row.get('cpu')}, Mem={row.get('memory')}, Disk={row.get('disk')}")
+                                elif data_type == 'process_load':
+                                    insert_process_load_data(
+                                        source_id,
+                                        process=row.get('process'),
+                                        load=row.get('load'),
+                                        timestamp=row.get('timestamp')
+                                    )
+                                    print(f"  Inserted Load: Process={row.get('process')}, Load={row.get('load')}")
+                                elif data_type == 'network_speed':
+                                    insert_network_speed_data(
+                                        source_id,
+                                        sent=row.get('sent'),
+                                        recv=row.get('recv'),
+                                        tx_speed=row.get('tx_speed'),
+                                        rx_speed=row.get('rx_speed'),
+                                        timestamp=row.get('timestamp')
+                                    )
+                                    print(f"  Inserted Speed: TxSpeed={row.get('tx_speed')}, RxSpeed={row.get('rx_speed')}")
             elif filepath and not os.path.exists(filepath):
                 print(f"[File Collector {source_id}] File does not exist: {filepath}")
         except Exception as e:
@@ -176,7 +235,8 @@ def mqtt_listener(source_id, config, stop_event):
             
             source = get_source(source_id)
             if source:
-                data_type, mapped_rows = auto_parse_and_map(raw_payload)
+                expected_type = source.get('data_type', 'unknown')
+                data_type, mapped_rows = auto_parse_and_map(raw_payload, expected_type=expected_type)
                 print(f"  Auto-parse result -> type: {data_type}, rows found: {len(mapped_rows) if mapped_rows else 0}")
                 if data_type != 'unknown' and mapped_rows:
                     if source['data_type'] == 'unknown':
@@ -209,8 +269,35 @@ def mqtt_listener(source_id, config, stop_event):
                                 timestamp=row.get('timestamp')
                             )
                             print(f"  Inserted Traffic: RxBps={row.get('rx_bps')}, TxBps={row.get('tx_bps')}")
+                        elif data_type == 'cpu_mem_disk':
+                            insert_cpu_mem_disk_data(
+                                source_id,
+                                cpu=row.get('cpu'),
+                                memory=row.get('memory'),
+                                disk=row.get('disk'),
+                                timestamp=row.get('timestamp')
+                            )
+                            print(f"  Inserted Resource: CPU={row.get('cpu')}, Mem={row.get('memory')}, Disk={row.get('disk')}")
+                        elif data_type == 'process_load':
+                            insert_process_load_data(
+                                source_id,
+                                process=row.get('process'),
+                                load=row.get('load'),
+                                timestamp=row.get('timestamp')
+                            )
+                            print(f"  Inserted Load: Process={row.get('process')}, Load={row.get('load')}")
+                        elif data_type == 'network_speed':
+                            insert_network_speed_data(
+                                source_id,
+                                sent=row.get('sent'),
+                                recv=row.get('recv'),
+                                tx_speed=row.get('tx_speed'),
+                                rx_speed=row.get('rx_speed'),
+                                timestamp=row.get('timestamp')
+                            )
+                            print(f"  Inserted Speed: TxSpeed={row.get('tx_speed')}, RxSpeed={row.get('rx_speed')}")
                 else:
-                    print("  Warning: Message payload was not mapped to any known data schema (environment or traffic).")
+                    print("  Warning: Message payload was not mapped to any known data schema (environment, traffic, cpu_mem_disk, process_load, network_speed).")
         except Exception as e:
             print(f"[MQTT Collector {source_id}] Error in MQTT message callback: {e}")
             

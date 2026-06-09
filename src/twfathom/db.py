@@ -65,9 +65,51 @@ def init_db():
     );
     """)
     
+    # 4. cpu_mem_disk_data table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS cpu_mem_disk_data (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_id INTEGER NOT NULL,
+        timestamp TEXT NOT NULL,
+        cpu REAL,
+        memory REAL,
+        disk REAL,
+        FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE
+    );
+    """)
+
+    # 5. process_load_data table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS process_load_data (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_id INTEGER NOT NULL,
+        timestamp TEXT NOT NULL,
+        process INTEGER,
+        load REAL,
+        FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE
+    );
+    """)
+
+    # 6. network_speed_data table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS network_speed_data (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_id INTEGER NOT NULL,
+        timestamp TEXT NOT NULL,
+        sent REAL,
+        recv REAL,
+        tx_speed REAL,
+        rx_speed REAL,
+        FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE
+    );
+    """)
+    
     # Create indexes for time series queries
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_env_source_time ON environment_data (source_id, timestamp);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_traffic_source_time ON traffic_data (source_id, timestamp);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_cpu_mem_disk_source_time ON cpu_mem_disk_data (source_id, timestamp);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_process_load_source_time ON process_load_data (source_id, timestamp);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_network_speed_source_time ON network_speed_data (source_id, timestamp);")
     
     # Check for legacy databases and migrate schema
     cursor.execute("PRAGMA table_info(sources);")
@@ -169,6 +211,42 @@ def insert_traffic_data(source_id, rx_pps=None, tx_pps=None, rx_bps=None, tx_bps
     conn.commit()
     conn.close()
 
+def insert_cpu_mem_disk_data(source_id, cpu=None, memory=None, disk=None, timestamp=None):
+    if timestamp is None:
+        timestamp = datetime.now().isoformat()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    INSERT INTO cpu_mem_disk_data (source_id, timestamp, cpu, memory, disk)
+    VALUES (?, ?, ?, ?, ?)
+    """, (source_id, timestamp, cpu, memory, disk))
+    conn.commit()
+    conn.close()
+
+def insert_process_load_data(source_id, process=None, load=None, timestamp=None):
+    if timestamp is None:
+        timestamp = datetime.now().isoformat()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    INSERT INTO process_load_data (source_id, timestamp, process, load)
+    VALUES (?, ?, ?, ?)
+    """, (source_id, timestamp, process, load))
+    conn.commit()
+    conn.close()
+
+def insert_network_speed_data(source_id, sent=None, recv=None, tx_speed=None, rx_speed=None, timestamp=None):
+    if timestamp is None:
+        timestamp = datetime.now().isoformat()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    INSERT INTO network_speed_data (source_id, timestamp, sent, recv, tx_speed, rx_speed)
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (source_id, timestamp, sent, recv, tx_speed, rx_speed))
+    conn.commit()
+    conn.close()
+
 # Data Retrieval
 def get_environment_history(source_id, limit=100):
     conn = get_db_connection()
@@ -210,10 +288,73 @@ def get_traffic_history(source_id, limit=100):
     conn.close()
     return [dict(r) for r in reversed(rows)]
 
+def get_cpu_mem_disk_history(source_id, limit=100):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if limit is None or limit <= 0:
+        cursor.execute("""
+        SELECT * FROM cpu_mem_disk_data
+        WHERE source_id = ?
+        ORDER BY timestamp DESC
+        """, (source_id,))
+    else:
+        cursor.execute("""
+        SELECT * FROM cpu_mem_disk_data
+        WHERE source_id = ?
+        ORDER BY timestamp DESC
+        LIMIT ?
+        """, (source_id, limit))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in reversed(rows)]
+
+def get_process_load_history(source_id, limit=100):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if limit is None or limit <= 0:
+        cursor.execute("""
+        SELECT * FROM process_load_data
+        WHERE source_id = ?
+        ORDER BY timestamp DESC
+        """, (source_id,))
+    else:
+        cursor.execute("""
+        SELECT * FROM process_load_data
+        WHERE source_id = ?
+        ORDER BY timestamp DESC
+        LIMIT ?
+        """, (source_id, limit))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in reversed(rows)]
+
+def get_network_speed_history(source_id, limit=100):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if limit is None or limit <= 0:
+        cursor.execute("""
+        SELECT * FROM network_speed_data
+        WHERE source_id = ?
+        ORDER BY timestamp DESC
+        """, (source_id,))
+    else:
+        cursor.execute("""
+        SELECT * FROM network_speed_data
+        WHERE source_id = ?
+        ORDER BY timestamp DESC
+        LIMIT ?
+        """, (source_id, limit))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in reversed(rows)]
+
 def clear_source_data(source_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM environment_data WHERE source_id = ?", (source_id,))
     cursor.execute("DELETE FROM traffic_data WHERE source_id = ?", (source_id,))
+    cursor.execute("DELETE FROM cpu_mem_disk_data WHERE source_id = ?", (source_id,))
+    cursor.execute("DELETE FROM process_load_data WHERE source_id = ?", (source_id,))
+    cursor.execute("DELETE FROM network_speed_data WHERE source_id = ?", (source_id,))
     conn.commit()
     conn.close()

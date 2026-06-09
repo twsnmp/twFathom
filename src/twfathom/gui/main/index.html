@@ -258,6 +258,18 @@
                     <input type="number" id="form-interval" class="glass-input" min="1" value="5" required>
                 </div>
 
+                <div class="form-group">
+                    <label for="form-data-type">データ種別</label>
+                    <select id="form-data-type" class="glass-input glass-select" required>
+                        <option value="unknown">自動判定</option>
+                        <option value="environment">環境データ</option>
+                        <option value="traffic">トラフィック</option>
+                        <option value="cpu_mem_disk">CPU・メモリ・ディスク</option>
+                        <option value="process_load">プロセス・負荷</option>
+                        <option value="network_speed">通信スピード</option>
+                    </select>
+                </div>
+
                 <!-- MQTT Configuration fields -->
                 <div id="config-mqtt" class="type-config">
                     <div class="form-group">

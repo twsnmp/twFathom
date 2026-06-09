@@ -161,6 +161,36 @@ class TestFileParsers(unittest.TestCase):
         self.assertEqual(results[0]['humidity'], 86.0)
         self.assertEqual(results[0]['pressure'], 1020.0)
 
+    def test_system_metrics_expected_type_mapping(self):
+        payload = '{"time":"2026-06-09T08:56:40+09:00","cpu":1.8256318026390712,"memory":2.93526088113524,"load":0.1,"sent":2283916,"recv":124232,"tx_speed":0.030452213333333332,"rx_speed":0.0016564266666666667,"process":131}'
+        
+        # Test mapping to cpu_mem_disk
+        dtype, results = auto_parse_and_map(payload, expected_type='cpu_mem_disk')
+        self.assertEqual(dtype, 'cpu_mem_disk')
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['timestamp'], '2026-06-09T08:56:40+09:00')
+        self.assertAlmostEqual(results[0]['cpu'], 1.8256318026390712)
+        self.assertAlmostEqual(results[0]['memory'], 2.93526088113524)
+        self.assertIsNone(results[0]['disk'])
+        
+        # Test mapping to process_load
+        dtype, results = auto_parse_and_map(payload, expected_type='process_load')
+        self.assertEqual(dtype, 'process_load')
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['timestamp'], '2026-06-09T08:56:40+09:00')
+        self.assertEqual(results[0]['process'], 131)
+        self.assertAlmostEqual(results[0]['load'], 0.1)
+        
+        # Test mapping to network_speed
+        dtype, results = auto_parse_and_map(payload, expected_type='network_speed')
+        self.assertEqual(dtype, 'network_speed')
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['timestamp'], '2026-06-09T08:56:40+09:00')
+        self.assertEqual(results[0]['sent'], 2283916.0)
+        self.assertEqual(results[0]['recv'], 124232.0)
+        self.assertAlmostEqual(results[0]['tx_speed'], 0.030452213333333332)
+        self.assertAlmostEqual(results[0]['rx_speed'], 0.0016564266666666667)
+
 if __name__ == '__main__':
     unittest.main()
 

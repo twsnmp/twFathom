@@ -12,6 +12,18 @@ TRAFFIC_KEYWORDS = {
     'pps', 'bps', 'rx_pps', 'tx_pps', 'rx_bps', 'tx_bps', 'rx', 'tx', 'packets', 'bytes', 'traffic'
 }
 
+SYSTEM_RESOURCE_KEYWORDS = {
+    'cpu', 'memory', 'mem', 'disk', 'storage', 'usage', '使用率'
+}
+
+SYSTEM_LOAD_KEYWORDS = {
+    'load', 'process', 'proc', 'load_average', 'load_avg', 'プロセス', '負荷'
+}
+
+SYSTEM_SPEED_KEYWORDS = {
+    'tx_speed', 'rx_speed', 'sent', 'recv', 'transmit_speed', 'receive_speed', 'speed', '通信', '送信', '受信'
+}
+
 # Mapping patterns using regular expressions for flexible naming
 ENV_MAPS = {
     'temperature': [re.compile(r'temp(erature)?$', re.I), re.compile(r'^t$', re.I)],
@@ -27,6 +39,24 @@ TRAFFIC_MAPS = {
     'tx_pps': [re.compile(r'tx_?pps$', re.I), re.compile(r'tx_?packets?$', re.I), re.compile(r't_?pps$', re.I)],
     'rx_bps': [re.compile(r'rx_?bps$', re.I), re.compile(r'rx_?bytes?$', re.I), re.compile(r'r_?bps$', re.I)],
     'tx_bps': [re.compile(r'tx_?bps$', re.I), re.compile(r'tx_?bytes?$', re.I), re.compile(r't_?bps$', re.I)]
+}
+
+SYSTEM_RESOURCE_MAPS = {
+    'cpu': [re.compile(r'cpu(_usage|_utilization)?$', re.I), re.compile(r'^cpu$', re.I)],
+    'memory': [re.compile(r'mem(ory)?(_usage|_utilization)?$', re.I), re.compile(r'^memory$', re.I), re.compile(r'^mem$', re.I)],
+    'disk': [re.compile(r'disk(_usage|_utilization)?$', re.I), re.compile(r'^disk$', re.I), re.compile(r'storage$', re.I)]
+}
+
+SYSTEM_LOAD_MAPS = {
+    'process': [re.compile(r'process(es|_count)?$', re.I), re.compile(r'^proc(s)?$', re.I), re.compile(r'^process$', re.I), re.compile(r'プロセス数?$', re.I)],
+    'load': [re.compile(r'load(_average|_avg)?$', re.I), re.compile(r'^load$', re.I), re.compile(r'負荷$', re.I)]
+}
+
+SYSTEM_SPEED_MAPS = {
+    'sent': [re.compile(r'sent$', re.I), re.compile(r'tx_?bytes$', re.I), re.compile(r'送信バイト?$', re.I)],
+    'recv': [re.compile(r'recv$', re.I), re.compile(r'rx_?bytes$', re.I), re.compile(r'受信バイト?$', re.I)],
+    'tx_speed': [re.compile(r'tx_?speed$', re.I), re.compile(r'transmit_?speed$', re.I), re.compile(r'送信速度$', re.I)],
+    'rx_speed': [re.compile(r'rx_?speed$', re.I), re.compile(r'receive_?speed$', re.I), re.compile(r'受信速度$', re.I)]
 }
 
 TIMESTAMP_MAPS = [
@@ -61,10 +91,14 @@ def match_key(key, patterns):
 
 def detect_data_type(keys):
     """
-    Given a list of keys (headers), detect if it represents 'environment' or 'traffic' data.
+    Given a list of keys (headers), detect if it represents 'environment', 'traffic',
+    'cpu_mem_disk', 'process_load', or 'network_speed' data.
     """
     env_matches = 0
     traffic_matches = 0
+    cpu_mem_disk_matches = 0
+    process_load_matches = 0
+    network_speed_matches = 0
     
     for key in keys:
         key_lower = str(key).lower()
@@ -72,16 +106,34 @@ def detect_data_type(keys):
             env_matches += 1
         if any(kw in key_lower for kw in TRAFFIC_KEYWORDS):
             traffic_matches += 1
+        if any(kw in key_lower for kw in SYSTEM_RESOURCE_KEYWORDS):
+            cpu_mem_disk_matches += 1
+        if any(kw in key_lower for kw in SYSTEM_LOAD_KEYWORDS):
+            process_load_matches += 1
+        if any(kw in key_lower for kw in SYSTEM_SPEED_KEYWORDS):
+            network_speed_matches += 1
             
-    if env_matches > traffic_matches:
-        return 'environment'
-    elif traffic_matches > env_matches:
-        return 'traffic'
-    return 'unknown'
+    matches = {
+        'environment': env_matches,
+        'traffic': traffic_matches,
+        'cpu_mem_disk': cpu_mem_disk_matches,
+        'process_load': process_load_matches,
+        'network_speed': network_speed_matches
+    }
+    
+    best_type = 'unknown'
+    max_match = 0
+    for t, m in matches.items():
+        if m > max_match:
+            max_match = m
+            best_type = t
+            
+    return best_type
 
 def map_fields(data_dict, schema_type):
     """
-    Maps a dictionary of arbitrary keys to the standard environment or traffic dictionary structure.
+    Maps a dictionary of arbitrary keys to the standard environment, traffic,
+    cpu_mem_disk, process_load, or network_speed dictionary structure.
     Includes mapping for an optional timestamp field.
     """
     mapped = {}
@@ -115,6 +167,39 @@ def map_fields(data_dict, schema_type):
                         pass
     elif schema_type == 'traffic':
         for target, patterns in TRAFFIC_MAPS.items():
+            mapped[target] = None
+            for key, val in data_dict.items():
+                if match_key(key, patterns):
+                    try:
+                        mapped[target] = float(val)
+                        break
+                    except (ValueError, TypeError):
+                        pass
+    elif schema_type == 'cpu_mem_disk':
+        for target, patterns in SYSTEM_RESOURCE_MAPS.items():
+            mapped[target] = None
+            for key, val in data_dict.items():
+                if match_key(key, patterns):
+                    try:
+                        mapped[target] = float(val)
+                        break
+                    except (ValueError, TypeError):
+                        pass
+    elif schema_type == 'process_load':
+        for target, patterns in SYSTEM_LOAD_MAPS.items():
+            mapped[target] = None
+            for key, val in data_dict.items():
+                if match_key(key, patterns):
+                    try:
+                        if target == 'process':
+                            mapped[target] = int(float(val))
+                        else:
+                            mapped[target] = float(val)
+                        break
+                    except (ValueError, TypeError):
+                        pass
+    elif schema_type == 'network_speed':
+        for target, patterns in SYSTEM_SPEED_MAPS.items():
             mapped[target] = None
             for key, val in data_dict.items():
                 if match_key(key, patterns):
@@ -163,7 +248,7 @@ def parse_csv(csv_str):
     except Exception:
         return []
 
-def auto_parse_and_map(raw_content, filename=None):
+def auto_parse_and_map(raw_content, expected_type=None):
     """
     Automatically parses the raw text based on whether it is CSV, JSON,
     and returns a tuple (data_type, mapped_list).
@@ -183,7 +268,11 @@ def auto_parse_and_map(raw_content, filename=None):
         
     # 2. Get keys/headers from the first row to detect data type
     sample_keys = parsed_rows[0].keys()
-    detected_type = detect_data_type(sample_keys)
+    
+    if expected_type and expected_type != 'unknown':
+        detected_type = expected_type
+    else:
+        detected_type = detect_data_type(sample_keys)
     
     if detected_type == 'unknown':
         return 'unknown', []

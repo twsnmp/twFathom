@@ -8,16 +8,18 @@ function openAddModal() {
     formSourceId.value = '';
     modalTitle.textContent = '新規ソース登録';
     document.getElementById('form-type').value = 'mqtt';
+    document.getElementById('form-data-type').value = 'unknown';
     handleTypeChange();
     modal.style.display = 'flex';
 }
 
-function openEditModal(id, name, type, configStr, interval) {
+function openEditModal(id, name, type, configStr, interval, dataType) {
     modalTitle.textContent = 'ソースの編集';
     formSourceId.value = id;
     document.getElementById('form-name').value = name;
     document.getElementById('form-type').value = type;
     document.getElementById('form-interval').value = interval;
+    document.getElementById('form-data-type').value = dataType || 'unknown';
     
     handleTypeChange();
     
@@ -68,6 +70,7 @@ async function saveSource(event) {
     const name = document.getElementById('form-name').value;
     const type = document.getElementById('form-type').value;
     const interval = parseInt(document.getElementById('form-interval').value, 10);
+    const dataType = document.getElementById('form-data-type').value;
     
     let config = {};
     
@@ -121,12 +124,12 @@ async function saveSource(event) {
                 type,
                 config,
                 interval,
-                source.data_type,
+                dataType,
                 source.active
             );
         } else {
             // Add
-            await window.pywebview.api.add_source(name, type, config, interval);
+            await window.pywebview.api.add_source(name, type, config, interval, dataType);
         }
         
         closeModal();
@@ -165,6 +168,9 @@ async function loadSources() {
             let dataTypeLabel = '未判定';
             if (src.data_type === 'environment') dataTypeLabel = '環境データ';
             else if (src.data_type === 'traffic') dataTypeLabel = 'トラフィック';
+            else if (src.data_type === 'cpu_mem_disk') dataTypeLabel = 'CPU・メモリ・ディスク';
+            else if (src.data_type === 'process_load') dataTypeLabel = 'プロセス・負荷';
+            else if (src.data_type === 'network_speed') dataTypeLabel = '通信スピード';
             
             const activeBadgeClass = src.active ? 'badge-active' : 'badge-paused';
             const activeText = src.active ? '監視中' : '一時停止';
@@ -189,7 +195,7 @@ async function loadSources() {
                                 `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`
                             }
                         </button>
-                        <button class="icon-btn" title="編集" onclick="openEditModal(${src.id}, '${escapeQuote(src.name)}', '${src.type}', '${safeConfig}', ${src.interval})">
+                        <button class="icon-btn" title="編集" onclick="openEditModal(${src.id}, '${escapeQuote(src.name)}', '${src.type}', '${safeConfig}', ${src.interval}, '${src.data_type}')">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
                         </button>
                         <button class="icon-btn icon-btn-danger" title="データ履歴をクリア" onclick="clearSourceData(${src.id})">

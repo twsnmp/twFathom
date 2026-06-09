@@ -14,9 +14,9 @@ class Bridge:
     def get_source(self, source_id):
         return db.get_source(source_id)
 
-    def add_source(self, name, type_, config_dict, interval):
+    def add_source(self, name, type_, config_dict, interval, data_type='unknown'):
         try:
-            source_id = db.add_source(name, type_, config_dict, interval)
+            source_id = db.add_source(name, type_, config_dict, interval, data_type)
             collectors.start_collector(source_id)
             return source_id
         except Exception as e:
@@ -74,6 +74,15 @@ class Bridge:
 
     def get_traffic_history(self, source_id, limit=-1):
         return db.get_traffic_history(source_id, limit)
+
+    def get_cpu_mem_disk_history(self, source_id, limit=-1):
+        return db.get_cpu_mem_disk_history(source_id, limit)
+
+    def get_process_load_history(self, source_id, limit=-1):
+        return db.get_process_load_history(source_id, limit)
+
+    def get_network_speed_history(self, source_id, limit=-1):
+        return db.get_network_speed_history(source_id, limit)
 
     def open_dashboard(self, source_id):
         if source_id in self._dashboard_windows:

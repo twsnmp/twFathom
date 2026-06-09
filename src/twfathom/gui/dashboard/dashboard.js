@@ -20,6 +20,23 @@ function formatNumber(num, decimals = 1) {
     return num.toFixed(decimals);
 }
 
+function formatBytesSize(bytes) {
+    if (bytes === null || bytes === undefined || isNaN(bytes)) return { value: '0', unit: 'B' };
+    if (bytes < 1024) return { value: bytes.toFixed(1), unit: 'B' };
+    if (bytes < 1024 * 1024) return { value: (bytes / 1024).toFixed(1), unit: 'KB' };
+    if (bytes < 1024 * 1024 * 1024) return { value: (bytes / (1024 * 1024)).toFixed(1), unit: 'MB' };
+    return { value: (bytes / (1024 * 1024 * 1024)).toFixed(1), unit: 'GB' };
+}
+
+function formatSpeed(mbPerSec) {
+    if (mbPerSec === null || mbPerSec === undefined || isNaN(mbPerSec)) return { value: '0', unit: 'KB/s' };
+    const kbPerSec = mbPerSec * 1024;
+    if (kbPerSec < 1024) {
+        return { value: kbPerSec.toFixed(1), unit: 'KB/s' };
+    }
+    return { value: mbPerSec.toFixed(2), unit: 'MB/s' };
+}
+
 // Initialise ECharts with premium dark theme configuration
 function initChart(type, data) {
     const chartDom = document.getElementById('main-chart');
@@ -481,6 +498,277 @@ function initChart(type, data) {
                 }
             ]
         };
+    } else if (type === 'cpu_mem_disk') {
+        const cpuData = data.map(d => d.cpu);
+        const memData = data.map(d => d.memory);
+        const diskData = data.map(d => d.disk);
+        const hasDisk = data.some(d => d.disk !== null && d.disk !== undefined);
+        
+        const legendData = ['CPU使用率 (%)', 'メモリ使用率 (%)'];
+        if (hasDisk) legendData.push('ディスク使用率 (%)');
+        
+        const seriesConfig = [
+            {
+                name: 'CPU使用率 (%)',
+                type: 'line',
+                smooth: true,
+                showSymbol: true,
+                symbol: 'circle',
+                symbolSize: 6,
+                data: cpuData,
+                itemStyle: { color: '#ef4444' },
+                lineStyle: { width: 3 },
+                yAxisIndex: 0,
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: 'rgba(239, 68, 68, 0.15)' },
+                        { offset: 1, color: 'rgba(239, 68, 68, 0)' }
+                    ])
+                }
+            },
+            {
+                name: 'メモリ使用率 (%)',
+                type: 'line',
+                smooth: true,
+                showSymbol: true,
+                symbol: 'circle',
+                symbolSize: 6,
+                data: memData,
+                itemStyle: { color: '#00d2ff' },
+                lineStyle: { width: 3 },
+                yAxisIndex: 1,
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: 'rgba(0, 210, 255, 0.15)' },
+                        { offset: 1, color: 'rgba(0, 210, 255, 0)' }
+                    ])
+                }
+            }
+        ];
+        
+        if (hasDisk) {
+            seriesConfig.push({
+                name: 'ディスク使用率 (%)',
+                type: 'line',
+                smooth: true,
+                showSymbol: true,
+                symbol: 'circle',
+                symbolSize: 6,
+                data: diskData,
+                itemStyle: { color: '#10b981' },
+                lineStyle: { width: 3 },
+                yAxisIndex: 1,
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: 'rgba(16, 185, 129, 0.15)' },
+                        { offset: 1, color: 'rgba(16, 185, 129, 0)' }
+                    ])
+                }
+            });
+        }
+        
+        option = {
+            backgroundColor: 'transparent',
+            tooltip: baseTooltip,
+            legend: {
+                data: legendData,
+                selected: savedLegend,
+                textStyle: { color: '#9ca3af', fontFamily: 'Inter' }
+            },
+            grid: baseGrid,
+            dataZoom: baseDataZoom,
+            xAxis: {
+                type: 'category',
+                boundaryGap: data.length <= 1,
+                data: timestamps,
+                axisLabel: { 
+                    color: '#9ca3af',
+                    formatter: function(value) {
+                        return value && value.includes(' ') ? value.split(' ')[1] : value;
+                    }
+                },
+                axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.1)' } }
+            },
+            yAxis: [
+                {
+                    type: 'value',
+                    name: 'CPU使用率 (%)',
+                    scale: true,
+                    axisLabel: { color: '#9ca3af' },
+                    splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } }
+                },
+                {
+                    type: 'value',
+                    name: 'メモリ/ディスク (%)',
+                    scale: true,
+                    axisLabel: { color: '#9ca3af' },
+                    splitLine: { show: false }
+                }
+            ],
+            series: seriesConfig
+        };
+    } else if (type === 'process_load') {
+        const processData = data.map(d => d.process);
+        const loadData = data.map(d => d.load);
+        
+        option = {
+            backgroundColor: 'transparent',
+            tooltip: baseTooltip,
+            legend: {
+                data: ['プロセス数 (個)', 'システム負荷 (Load)'],
+                selected: savedLegend,
+                textStyle: { color: '#9ca3af', fontFamily: 'Inter' }
+            },
+            grid: baseGrid,
+            dataZoom: baseDataZoom,
+            xAxis: {
+                type: 'category',
+                boundaryGap: data.length <= 1,
+                data: timestamps,
+                axisLabel: { 
+                    color: '#9ca3af',
+                    formatter: function(value) {
+                        return value && value.includes(' ') ? value.split(' ')[1] : value;
+                    }
+                },
+                axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.1)' } }
+            },
+            yAxis: [
+                {
+                    type: 'value',
+                    name: 'プロセス数',
+                    scale: true,
+                    axisLabel: { color: '#9ca3af' },
+                    splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } }
+                },
+                {
+                    type: 'value',
+                    name: 'システム負荷',
+                    scale: true,
+                    axisLabel: { color: '#9ca3af' },
+                    splitLine: { show: false }
+                }
+            ],
+            series: [
+                {
+                    name: 'プロセス数 (個)',
+                    type: 'line',
+                    smooth: true,
+                    showSymbol: true,
+                    symbol: 'circle',
+                    symbolSize: 6,
+                    data: processData,
+                    itemStyle: { color: '#bd00ff' },
+                    lineStyle: { width: 3 },
+                    yAxisIndex: 0,
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(189, 0, 255, 0.15)' },
+                            { offset: 1, color: 'rgba(189, 0, 255, 0)' }
+                        ])
+                    }
+                },
+                {
+                    name: 'システム負荷 (Load)',
+                    type: 'line',
+                    smooth: true,
+                    showSymbol: true,
+                    symbol: 'circle',
+                    symbolSize: 6,
+                    data: loadData,
+                    itemStyle: { color: '#f59e0b' },
+                    lineStyle: { width: 3 },
+                    yAxisIndex: 1,
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(245, 158, 11, 0.15)' },
+                            { offset: 1, color: 'rgba(245, 158, 11, 0)' }
+                        ])
+                    }
+                }
+            ]
+        };
+    } else if (type === 'network_speed') {
+        const txSpeed = data.map(d => d.tx_speed);
+        const rxSpeed = data.map(d => d.rx_speed);
+        
+        option = {
+            backgroundColor: 'transparent',
+            tooltip: baseTooltip,
+            legend: {
+                data: ['送信速度 (MB/s)', '受信速度 (MB/s)'],
+                selected: savedLegend,
+                textStyle: { color: '#9ca3af', fontFamily: 'Inter' }
+            },
+            grid: baseGrid,
+            dataZoom: baseDataZoom,
+            xAxis: {
+                type: 'category',
+                boundaryGap: data.length <= 1,
+                data: timestamps,
+                axisLabel: { 
+                    color: '#9ca3af',
+                    formatter: function(value) {
+                        return value && value.includes(' ') ? value.split(' ')[1] : value;
+                    }
+                },
+                axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.1)' } }
+            },
+            yAxis: [
+                {
+                    type: 'value',
+                    name: '送信速度 (MB/s)',
+                    scale: true,
+                    axisLabel: { color: '#9ca3af' },
+                    splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } }
+                },
+                {
+                    type: 'value',
+                    name: '受信速度 (MB/s)',
+                    scale: true,
+                    axisLabel: { color: '#9ca3af' },
+                    splitLine: { show: false }
+                }
+            ],
+            series: [
+                {
+                    name: '送信速度 (MB/s)',
+                    type: 'line',
+                    smooth: true,
+                    showSymbol: true,
+                    symbol: 'circle',
+                    symbolSize: 6,
+                    data: txSpeed,
+                    itemStyle: { color: '#bd00ff' },
+                    lineStyle: { width: 3 },
+                    yAxisIndex: 0,
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(189, 0, 255, 0.15)' },
+                            { offset: 1, color: 'rgba(189, 0, 255, 0)' }
+                        ])
+                    }
+                },
+                {
+                    name: '受信速度 (MB/s)',
+                    type: 'line',
+                    smooth: true,
+                    showSymbol: true,
+                    symbol: 'circle',
+                    symbolSize: 6,
+                    data: rxSpeed,
+                    itemStyle: { color: '#00f5d4' },
+                    lineStyle: { width: 3 },
+                    yAxisIndex: 1,
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(0, 245, 212, 0.15)' },
+                            { offset: 1, color: 'rgba(0, 245, 212, 0)' }
+                        ])
+                    }
+                }
+            ]
+        };
     }
     
     chart.setOption(option, true);
@@ -543,6 +831,74 @@ function updateKpiCards(type, latestData) {
             `;
             list.appendChild(card);
         });
+    } else if (type === 'cpu_mem_disk') {
+        const fields = [
+            { label: 'CPU 使用率', val: latestData.cpu, unit: '%', color: '#ef4444' },
+            { label: 'メモリ使用率', val: latestData.memory, unit: '%', color: '#00d2ff' }
+        ];
+        
+        if (latestData.disk !== null && latestData.disk !== undefined) {
+            fields.push({ label: 'ディスク使用率', val: latestData.disk, unit: '%', color: '#10b981' });
+        }
+        
+        fields.forEach(f => {
+            if (f.val === null || f.val === undefined) return;
+            
+            const card = document.createElement('div');
+            card.className = 'glass-card kpi-card';
+            card.style.setProperty('--card-accent', f.color);
+            
+            card.innerHTML = `
+                <span class="kpi-title">${f.label}</span>
+                <div class="kpi-value">${formatNumber(f.val, 1)}<span class="kpi-unit">${f.unit}</span></div>
+            `;
+            list.appendChild(card);
+        });
+    } else if (type === 'process_load') {
+        const fields = [
+            { label: 'プロセス数', val: latestData.process, unit: '個', color: '#bd00ff', isInteger: true },
+            { label: 'システム負荷', val: latestData.load, unit: 'Load', color: '#f59e0b', isInteger: false }
+        ];
+        
+        fields.forEach(f => {
+            if (f.val === null || f.val === undefined) return;
+            
+            const card = document.createElement('div');
+            card.className = 'glass-card kpi-card';
+            card.style.setProperty('--card-accent', f.color);
+            
+            card.innerHTML = `
+                <span class="kpi-title">${f.label}</span>
+                <div class="kpi-value">${f.isInteger ? f.val : formatNumber(f.val, 2)}<span class="kpi-unit">${f.unit}</span></div>
+            `;
+            list.appendChild(card);
+        });
+    } else if (type === 'network_speed') {
+        const txSp = formatSpeed(latestData.tx_speed);
+        const rxSp = formatSpeed(latestData.rx_speed);
+        const txBytes = formatBytesSize(latestData.sent);
+        const rxBytes = formatBytesSize(latestData.recv);
+        
+        const fields = [
+            { label: '送信速度', val: parseFloat(txSp.value), unit: txSp.unit, color: '#bd00ff', decimals: txSp.unit === 'KB/s' ? 1 : 2 },
+            { label: '受信速度', val: parseFloat(rxSp.value), unit: rxSp.unit, color: '#00f5d4', decimals: rxSp.unit === 'KB/s' ? 1 : 2 },
+            { label: '送信データ量', val: parseFloat(txBytes.value), unit: txBytes.unit, color: '#e0aaff', decimals: 1 },
+            { label: '受信データ量', val: parseFloat(rxBytes.value), unit: rxBytes.unit, color: '#c8b6ff', decimals: 1 }
+        ];
+        
+        fields.forEach(f => {
+            if (f.val === null || f.val === undefined || isNaN(f.val)) return;
+            
+            const card = document.createElement('div');
+            card.className = 'glass-card kpi-card';
+            card.style.setProperty('--card-accent', f.color);
+            
+            card.innerHTML = `
+                <span class="kpi-title">${f.label}</span>
+                <div class="kpi-value">${formatNumber(f.val, f.decimals)}<span class="kpi-unit">${f.unit}</span></div>
+            `;
+            list.appendChild(card);
+        });
     }
 }
 
@@ -594,6 +950,36 @@ async function pollDashboard() {
                 lastDataSignature = signature;
                 updateKpiCards('traffic', history[history.length - 1]);
                 initChart('traffic', history);
+            }
+        } else if (dataType === 'cpu_mem_disk') {
+            document.getElementById('chart-main-title').textContent = 'システムリソース 時系列データ';
+            const history = await window.pywebview.api.get_cpu_mem_disk_history(sourceId, -1);
+            
+            const signature = history.length > 0 ? `${history.length}_${history[history.length - 1].timestamp}` : 'empty';
+            if (signature !== lastDataSignature) {
+                lastDataSignature = signature;
+                updateKpiCards('cpu_mem_disk', history[history.length - 1]);
+                initChart('cpu_mem_disk', history);
+            }
+        } else if (dataType === 'process_load') {
+            document.getElementById('chart-main-title').textContent = 'システム負荷・プロセス 時系列データ';
+            const history = await window.pywebview.api.get_process_load_history(sourceId, -1);
+            
+            const signature = history.length > 0 ? `${history.length}_${history[history.length - 1].timestamp}` : 'empty';
+            if (signature !== lastDataSignature) {
+                lastDataSignature = signature;
+                updateKpiCards('process_load', history[history.length - 1]);
+                initChart('process_load', history);
+            }
+        } else if (dataType === 'network_speed') {
+            document.getElementById('chart-main-title').textContent = 'ネットワーク通信速度 時系列データ';
+            const history = await window.pywebview.api.get_network_speed_history(sourceId, -1);
+            
+            const signature = history.length > 0 ? `${history.length}_${history[history.length - 1].timestamp}` : 'empty';
+            if (signature !== lastDataSignature) {
+                lastDataSignature = signature;
+                updateKpiCards('network_speed', history[history.length - 1]);
+                initChart('network_speed', history);
             }
         } else {
             // Unknown datatype yet
