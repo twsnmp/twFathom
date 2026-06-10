@@ -911,6 +911,10 @@ async function pollDashboard() {
         if (!source) return;
         
         document.getElementById('source-name').innerHTML = `<span class="title-gradient">${source.name}</span>`;
+        const titlebarTitle = document.getElementById('titlebar-window-title');
+        if (titlebarTitle) {
+            titlebarTitle.textContent = `${source.name} - ダッシュボード`;
+        }
         
         let subTitle = '';
         if (source.type === 'mqtt') subTitle = `MQTT: Broker ${source.config.broker} | Topic ${source.config.topic}`;
@@ -995,4 +999,86 @@ window.addEventListener('pywebviewready', () => {
     pollDashboard();
     // Refresh every 2 seconds
     setInterval(pollDashboard, 2000);
+});
+
+// Window control actions
+function closeDashboardWindow() {
+    if (window.pywebview && window.pywebview.api && sourceId) {
+        window.pywebview.api.close_dashboard(sourceId);
+    }
+}
+
+// Minimize window
+function minimizeDashboardWindow() {
+    if (window.pywebview && window.pywebview.api && sourceId) {
+        window.pywebview.api.minimize_dashboard(sourceId);
+    }
+}
+
+// Window resizing logic
+function setupWindowResize() {
+    const handleR = document.getElementById('resize-r');
+    const handleB = document.getElementById('resize-b');
+    const handleBR = document.getElementById('resize-br');
+    
+    if (!handleR || !handleB || !handleBR) return;
+    
+    let isResizing = false;
+    let resizeType = ''; // 'r', 'b', 'br'
+    let startMouseX, startMouseY, startWidth, startHeight;
+    let currentWidth, currentHeight;
+    let resizePending = false;
+    
+    const startResize = (e, type) => {
+        isResizing = true;
+        resizeType = type;
+        startMouseX = e.screenX;
+        startMouseY = e.screenY;
+        startWidth = window.outerWidth;
+        startHeight = window.outerHeight;
+        currentWidth = startWidth;
+        currentHeight = startHeight;
+        
+        e.preventDefault();
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    };
+    
+    handleR.addEventListener('mousedown', (e) => startResize(e, 'r'));
+    handleB.addEventListener('mousedown', (e) => startResize(e, 'b'));
+    handleBR.addEventListener('mousedown', (e) => startResize(e, 'br'));
+    
+    function onMouseMove(e) {
+        if (!isResizing) return;
+        const dx = e.screenX - startMouseX;
+        const dy = e.screenY - startMouseY;
+        
+        if (resizeType === 'r' || resizeType === 'br') {
+            currentWidth = Math.max(450, startWidth + dx);
+        }
+        if (resizeType === 'b' || resizeType === 'br') {
+            currentHeight = Math.max(350, startHeight + dy);
+        }
+        
+        if (!resizePending) {
+            resizePending = true;
+            requestAnimationFrame(() => {
+                if (window.pywebview && window.pywebview.api && sourceId) {
+                    window.pywebview.api.resize_dashboard(sourceId, currentWidth, currentHeight);
+                }
+                resizePending = false;
+            });
+        }
+    }
+    
+    function onMouseUp() {
+        isResizing = false;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+    }
+}
+
+// Call setupWindowResize on pywebviewready
+window.addEventListener('pywebviewready', () => {
+    setupWindowResize();
 });

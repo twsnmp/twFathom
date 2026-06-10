@@ -146,6 +146,7 @@ async function loadSources() {
     
     try {
         const sources = await window.pywebview.api.get_sources();
+        const openDashboards = await window.pywebview.api.get_open_dashboards();
         const tbody = document.getElementById('source-list');
         const noDataMsg = document.getElementById('no-data-msg');
         
@@ -178,6 +179,11 @@ async function loadSources() {
             // Safe JSON config for onclick injection
             const safeConfig = JSON.stringify(src.config).replace(/"/g, '&quot;');
             
+            // Check if dashboard is currently open
+            const isDashboardOpen = openDashboards.includes(src.id);
+            const dashboardBtnClass = isDashboardOpen ? 'icon-btn-active' : 'icon-btn-primary';
+            const dashboardBtnTooltip = isDashboardOpen ? 'ダッシュボードを閉じる' : 'ダッシュボードを表示';
+            
             tr.innerHTML = `
                 <td style="font-family: var(--font-outfit); font-weight: 600; font-size: 15px;">${escapeHtml(src.name)}</td>
                 <td><span class="badge badge-type">${typeLabel}</span></td>
@@ -186,7 +192,7 @@ async function loadSources() {
                 <td><span class="badge ${activeBadgeClass}">${activeText}</span></td>
                 <td style="text-align: right;">
                     <div class="action-btns" style="justify-content: flex-end;">
-                        <button class="icon-btn icon-btn-primary" title="ダッシュボードを表示" onclick="openDashboard(${src.id})">
+                        <button class="icon-btn ${dashboardBtnClass}" title="${dashboardBtnTooltip}" onclick="openDashboard(${src.id})">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
                         </button>
                         <button class="icon-btn" title="アクティブ切り替え" onclick="toggleActive(${src.id})">
@@ -251,7 +257,7 @@ async function clearSourceData(id) {
 
 function openDashboard(id) {
     if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.open_dashboard(id);
+        window.pywebview.api.toggle_dashboard(id);
     }
 }
 
@@ -266,6 +272,12 @@ function escapeHtml(str) {
 
 function escapeQuote(str) {
     return str.replace(/'/g, "\\'");
+}
+
+function autoArrange() {
+    if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.auto_arrange_dashboards();
+    }
 }
 
 // Initial Loading

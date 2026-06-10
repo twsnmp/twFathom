@@ -125,8 +125,41 @@ def init_db():
     if 'illuminance' not in env_columns:
         cursor.execute("ALTER TABLE environment_data ADD COLUMN illuminance REAL;")
         
+    # 7. window_states table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS window_states (
+        window_id TEXT PRIMARY KEY,
+        x INTEGER,
+        y INTEGER,
+        width INTEGER,
+        height INTEGER,
+        is_open INTEGER DEFAULT 0
+    );
+    """)
+        
     conn.commit()
     conn.close()
+
+# Window State Persistence
+def save_window_state(window_id, x, y, width, height, is_open):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    INSERT OR REPLACE INTO window_states (window_id, x, y, width, height, is_open)
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (window_id, x, y, width, height, is_open))
+    conn.commit()
+    conn.close()
+
+def get_window_state(window_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT x, y, width, height, is_open FROM window_states WHERE window_id = ?", (window_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return dict(row)
+    return None
 
 # Source CRUD
 def add_source(name, type_, config_dict, interval, data_type="unknown"):
