@@ -391,3 +391,93 @@ def clear_source_data(source_id):
     cursor.execute("DELETE FROM network_speed_data WHERE source_id = ?", (source_id,))
     conn.commit()
     conn.close()
+
+def get_baseline_stats(source_id, data_type, preprocess_type='residual', window_size=10):
+    """
+    指定されたデータソースの過去すべてのデータから、各カラムの平均と不偏分散をSQLite上で計算します。
+    """
+    columns_map = {
+        'environment': ['temperature', 'humidity', 'soil_moisture', 'pressure', 'co2', 'illuminance'],
+        'traffic': ['rx_pps', 'tx_pps', 'rx_bps', 'tx_bps'],
+        'cpu_mem_disk': ['cpu', 'memory', 'disk'],
+        'process_load': ['process', 'load'],
+        'network_speed': ['tx_speed', 'rx_speed']
+    }
+    cols = columns_map.get(data_type, [])
+    if not cols:
+        return {}
+        
+    table_name = f"{data_type}_data"
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    stats = {}
+    for col in cols:
+        try:
+            if preprocess_type == 'diff':
+                query = f"""
+                WITH prep AS (
+                    SELECT 
+                        {col} - LAG({col}) OVER (ORDER BY timestamp) as val
+                    FROM {table_name}
+                    WHERE source_id = ? AND {col} IS NOT NULL
+                )
+                SELECT 
+                    COUNT(*) as count,
+                    AVG(val) as mean,
+                    CASE 
+                        WHEN COUNT(*) > 1 THEN 
+                            (SUM(val * val) - COUNT(*) * AVG(val) * AVG(val)) / (COUNT(*) - 1)
+                        ELSE 0.0
+                    END as variance
+                FROM prep
+                """
+            elif preprocess_type == 'residual':
+                query = f"""
+                WITH prep AS (
+                    SELECT 
+                        {col} - AVG({col}) OVER (
+                            ORDER BY timestamp 
+                            ROWS BETWEEN ? PRECEDING AND CURRENT ROW
+                        ) as val
+                    FROM {table_name}
+                    WHERE source_id = ? AND {col} IS NOT NULL
+                )
+                SELECT 
+                    COUNT(*) as count,
+                    AVG(val) as mean,
+                    CASE 
+                        WHEN COUNT(*) > 1 THEN 
+                            (SUM(val * val) - COUNT(*) * AVG(val) * AVG(val)) / (COUNT(*) - 1)
+                        ELSE 0.0
+                    END as variance
+                FROM prep
+                """
+            else: # 'raw'
+                query = f"""
+                SELECT 
+                    COUNT(*) as count,
+                    AVG({col}) as mean,
+                    CASE 
+                        WHEN COUNT(*) > 1 THEN 
+                            (SUM({col} * {col}) - COUNT(*) * AVG({col}) * AVG({col})) / (COUNT(*) - 1)
+                        ELSE 0.0
+                    END as variance
+                FROM {table_name}
+                WHERE source_id = ? AND {col} IS NOT NULL
+                """
+            
+            if preprocess_type == 'residual':
+                cursor.execute(query, (window_size - 1, source_id))
+            else:
+                cursor.execute(query, (source_id,))
+                
+            res = cursor.fetchone()
+            if res and res['count'] >= 5:
+                stats[col] = (float(res['mean']), float(res['variance']))
+        except Exception as e:
+            print(f"Error calculating baseline stats for {col}: {e}")
+            
+    conn.close()
+    return stats
+

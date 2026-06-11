@@ -1,7 +1,11 @@
 let sourceId = null;
 let chart = null;
+let anomalyChart = null;
+let anomalyViewMode = 'tiles'; // 'tiles' or 'chart'
+let anomalyEnabled = false;
 let dataType = 'unknown';
 let lastDataSignature = '';
+let lastAnomalySignature = '';
 
 // Parse query params to get source ID
 const urlParams = new URLSearchParams(window.location.search);
@@ -35,6 +39,392 @@ function formatSpeed(mbPerSec) {
         return { value: kbPerSec.toFixed(1), unit: 'KB/s' };
     }
     return { value: mbPerSec.toFixed(2), unit: 'MB/s' };
+}
+
+// Initialise ECharts for anomaly score line chart
+function initAnomalyChart(data) {
+    const chartDom = document.getElementById('anomaly-chart');
+    if (!chartDom) return;
+    
+    let savedZoom = null;
+    if (anomalyChart) {
+        const currentOption = anomalyChart.getOption();
+        if (currentOption && currentOption.dataZoom && currentOption.dataZoom[0]) {
+            savedZoom = {
+                start: currentOption.dataZoom[0].start,
+                end: currentOption.dataZoom[0].end
+            };
+        }
+    }
+    
+    if (!anomalyChart) {
+        anomalyChart = echarts.init(chartDom);
+        const resizeObserver = new ResizeObserver(() => {
+            if (anomalyChart) anomalyChart.resize();
+        });
+        resizeObserver.observe(chartDom);
+    }
+    
+    const timestamps = data.timestamps.map(t => {
+        try {
+            const dt = new Date(t);
+            const dateStr = dt.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
+            const timeStr = dt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            return `${dateStr} ${timeStr}`;
+        } catch(e) {
+            return t;
+        }
+    });
+    
+    const baseGrid = {
+        left: '4%',
+        right: '4%',
+        bottom: '60px',
+        top: '45px',
+        containLabel: true
+    };
+    
+    const baseTooltip = {
+        trigger: 'axis',
+        backgroundColor: 'rgba(23, 25, 35, 0.9)',
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        textStyle: { color: '#f3f4f6' },
+        axisPointer: { type: 'cross' }
+    };
+    
+    const baseDataZoom = [
+        {
+            type: 'slider',
+            show: true,
+            xAxisIndex: [0],
+            start: savedZoom ? savedZoom.start : 0,
+            end: savedZoom ? savedZoom.end : 100,
+            height: 16,
+            bottom: 12,
+            borderColor: 'rgba(255, 255, 255, 0.08)',
+            backgroundColor: 'rgba(255, 255, 255, 0.01)',
+            fillerColor: 'rgba(239, 68, 68, 0.08)',
+            handleIcon: 'path://M-1.5,0.5c0-0.2,0.1-0.4,0.3-0.5c0.2-0.1,0.4-0.1,0.6,0c0.2,0.1,0.3,0.3,0.3,0.5v15c0,0.2-0.1,0.4-0.3,0.5c-0.2,0.1-0.4,0.1-0.6,0c-0.2-0.1-0.3-0.3-0.3-0.5V0.5z',
+            handleSize: '120%',
+            handleStyle: {
+                color: '#ef4444',
+                borderColor: 'rgba(239, 68, 68, 0.4)',
+                shadowBlur: 3,
+                shadowColor: 'rgba(239, 68, 68, 0.2)'
+            },
+            moveHandleStyle: {
+                color: 'rgba(239, 68, 68, 0.2)'
+            },
+            textStyle: {
+                color: '#9ca3af',
+                fontFamily: 'Inter',
+                fontSize: 9
+            },
+            brushSelect: false
+        },
+        {
+            type: 'inside',
+            xAxisIndex: [0],
+            start: savedZoom ? savedZoom.start : 0,
+            end: savedZoom ? savedZoom.end : 100,
+            zoomOnMouseWheel: true,
+            moveOnMouseMove: true
+        }
+    ];
+    
+    const option = {
+        backgroundColor: 'transparent',
+        tooltip: baseTooltip,
+        grid: baseGrid,
+        dataZoom: baseDataZoom,
+        xAxis: {
+            type: 'category',
+            boundaryGap: data.scores.length <= 1,
+            data: timestamps,
+            axisLabel: { 
+                color: '#9ca3af',
+                formatter: function(value) {
+                    return value && value.includes(' ') ? value.split(' ')[1] : value;
+                }
+            },
+            axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.1)' } }
+        },
+        yAxis: {
+            type: 'value',
+            name: '異常度スコア',
+            scale: true,
+            axisLabel: { color: '#9ca3af' },
+            splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } }
+        },
+        series: [
+            {
+                name: '異常度',
+                type: 'line',
+                smooth: true,
+                showSymbol: true,
+                symbol: 'circle',
+                symbolSize: 6,
+                data: data.scores,
+                itemStyle: { color: '#ef4444' },
+                lineStyle: { width: 3 },
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: 'rgba(239, 68, 68, 0.15)' },
+                        { offset: 1, color: 'rgba(239, 68, 68, 0)' }
+                    ])
+                },
+                markLine: {
+                    silent: true,
+                    symbol: 'none',
+                    label: {
+                        position: 'end',
+                        color: '#9ca3af',
+                        fontSize: 10
+                    },
+                    data: [
+                        {
+                            yAxis: 3.84,
+                            name: '注意 (3.84)',
+                            lineStyle: {
+                                color: 'rgba(245, 158, 11, 0.5)',
+                                type: 'dashed',
+                                width: 1.5
+                            }
+                        },
+                        {
+                            yAxis: 6.63,
+                            name: '異常 (6.63)',
+                            lineStyle: {
+                                color: 'rgba(239, 68, 68, 0.5)',
+                                type: 'dashed',
+                                width: 1.5
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    };
+    
+    anomalyChart.setOption(option, true);
+}
+
+
+
+// Build GitHub-style colored history tiles for past anomaly scores
+function updateAnomalyHistoryGrid(anomalyResult) {
+    const gridDom = document.getElementById('anomaly-history-grid');
+    const titleDom = document.getElementById('anomaly-history-title');
+    const tooltip = document.getElementById('anomaly-grid-tooltip');
+    if (!gridDom) return;
+    
+    gridDom.innerHTML = '';
+    
+    const scores = anomalyResult.scores || [];
+    const timestamps = anomalyResult.timestamps || [];
+    
+    // Calculate display limit dynamically to fit exactly based on grid container width and height
+    const gridWidth = gridDom.getBoundingClientRect().width || gridDom.clientWidth || 500;
+    const gridHeight = gridDom.getBoundingClientRect().height || gridDom.clientHeight || 80;
+    const padding = 16; // 8px left + 8px right padding
+    const itemWidth = 10;
+    const itemHeight = 14;
+    const gap = 3;
+    
+    // Number of items that can fit in a single row
+    const itemsPerRow = Math.floor((gridWidth - padding + gap) / (itemWidth + gap)) || 30;
+    // Number of rows that can fit vertically (subtract padding)
+    const rowsCount = Math.floor((gridHeight - padding + gap) / (itemHeight + gap)) || 2;
+    // Enforce at least 2 rows
+    const finalRows = Math.max(2, rowsCount);
+    
+    const displayLimit = itemsPerRow * finalRows;
+    
+    if (titleDom) {
+        titleDom.textContent = `判定履歴 (直近${displayLimit}件)`;
+    }
+    
+    const startIdx = Math.max(0, scores.length - displayLimit);
+    
+    for (let i = startIdx; i < scores.length; i++) {
+        const score = scores[i];
+        const ts = timestamps[i];
+        
+        let status = 'normal';
+        let color = 'rgba(16, 185, 129, 0.25)'; // Normal (translucent green)
+        let border = '1px solid rgba(16, 185, 129, 0.4)';
+        
+        if (score > 6.63) {
+            status = 'critical';
+            color = 'rgba(239, 68, 68, 0.9)'; // Critical (red)
+            border = '1px solid #ef4444';
+        } else if (score > 3.84) {
+            status = 'warning';
+            color = 'rgba(245, 158, 11, 0.8)'; // Warning (yellow)
+            border = '1px solid var(--color-warning)';
+        }
+        
+        // Format timestamp to readable Japanese local format
+        let timeStr = ts;
+        try {
+            const dt = new Date(ts);
+            timeStr = dt.toLocaleString('ja-JP');
+        } catch(e) {}
+        
+        const tile = document.createElement('div');
+        tile.style.width = '10px';
+        tile.style.height = '14px';
+        tile.style.backgroundColor = color;
+        tile.style.border = border;
+        tile.style.borderRadius = '2px';
+        tile.style.cursor = 'pointer';
+        
+        // Hover micro-animations
+        tile.style.transition = 'all 0.1s ease';
+        
+        tile.addEventListener('mouseenter', () => {
+            tile.style.transform = 'scale(1.2)';
+            tile.style.zIndex = '10';
+            if (status === 'normal') {
+                tile.style.backgroundColor = 'rgba(16, 185, 129, 0.8)';
+            }
+        });
+        
+        tile.addEventListener('mousemove', (e) => {
+            if (tooltip) {
+                tooltip.style.display = 'block';
+                // Position tooltip slightly offset from cursor
+                tooltip.style.left = (e.clientX + 12) + 'px';
+                tooltip.style.top = (e.clientY + 12) + 'px';
+                
+                let scoreText = score.toFixed(2);
+                let statusBadge = '';
+                if (status === 'critical') {
+                    statusBadge = '<span style="color: #ef4444; font-weight: bold; margin-left: 6px;">[異常]</span>';
+                } else if (status === 'warning') {
+                    statusBadge = '<span style="color: var(--color-warning); font-weight: bold; margin-left: 6px;">[注意]</span>';
+                } else {
+                    statusBadge = '<span style="color: var(--color-success); font-weight: bold; margin-left: 6px;">[正常]</span>';
+                }
+                
+                tooltip.innerHTML = `
+                    <div style="margin-bottom: 4px;"><strong>日時:</strong> ${timeStr}</div>
+                    <div><strong>異常度:</strong> ${scoreText}${statusBadge}</div>
+                `;
+            }
+        });
+        
+        tile.addEventListener('mouseleave', () => {
+            tile.style.transform = 'scale(1)';
+            tile.style.zIndex = '1';
+            tile.style.backgroundColor = color;
+            if (tooltip) {
+                tooltip.style.display = 'none';
+            }
+        });
+        
+        gridDom.appendChild(tile);
+    }
+    
+    if (scores.length === 0) {
+        gridDom.innerHTML = '<div style="font-size: 11px; color: var(--text-muted); width: 100%; text-align: center;">履歴データがありません</div>';
+    }
+}
+
+// Setup anomaly view mode selector (tiles vs chart)
+function setupAnomalyViewMode() {
+    const btnTiles = document.getElementById('btn-view-tiles');
+    const btnChart = document.getElementById('btn-view-chart');
+    if (!btnTiles || !btnChart) return;
+    
+    const savedMode = localStorage.getItem(`anomaly_view_mode_${sourceId}`);
+    anomalyViewMode = savedMode || 'tiles';
+    
+    const updateViewUI = () => {
+        const viewTiles = document.getElementById('anomaly-tiles-view');
+        const viewChart = document.getElementById('anomaly-chart-view');
+        
+        if (anomalyViewMode === 'tiles') {
+            btnTiles.classList.add('active');
+            btnChart.classList.remove('active');
+            if (viewTiles) viewTiles.style.display = 'flex';
+            if (viewChart) viewChart.style.display = 'none';
+        } else {
+            btnTiles.classList.remove('active');
+            btnChart.classList.add('active');
+            if (viewTiles) viewTiles.style.display = 'none';
+            if (viewChart) viewChart.style.display = 'block';
+            
+            // Force ECharts reflow when showing chart view
+            setTimeout(() => {
+                if (anomalyChart) anomalyChart.resize();
+            }, 50);
+        }
+    };
+    
+    updateViewUI();
+    
+    btnTiles.addEventListener('click', () => {
+        anomalyViewMode = 'tiles';
+        localStorage.setItem(`anomaly_view_mode_${sourceId}`, 'tiles');
+        updateViewUI();
+        pollDashboard();
+    });
+    
+    btnChart.addEventListener('click', () => {
+        anomalyViewMode = 'chart';
+        localStorage.setItem(`anomaly_view_mode_${sourceId}`, 'chart');
+        updateViewUI();
+        pollDashboard();
+    });
+}
+
+// Setup anomaly button behavior and state persistence
+function setupAnomalyToggle() {
+    const btn = document.getElementById('btn-anomaly');
+    if (!btn) return;
+    
+    // Load state from localStorage
+    const saved = localStorage.getItem(`anomaly_enabled_${sourceId}`);
+    anomalyEnabled = (saved === 'true');
+    
+    const updateButtonUI = () => {
+        const mainChartContainer = document.getElementById('main-chart-container');
+        if (anomalyEnabled) {
+            btn.classList.add('active');
+            btn.style.background = 'var(--color-primary-gradient)';
+            btn.style.color = '#050508';
+            btn.style.boxShadow = '0 2px 8px rgba(0, 210, 255, 0.2)';
+            const svg = btn.querySelector('svg');
+            if (svg) svg.style.color = '#050508';
+            
+            if (mainChartContainer) mainChartContainer.style.display = 'none';
+        } else {
+            btn.classList.remove('active');
+            btn.style.background = 'rgba(255, 255, 255, 0.04)';
+            btn.style.color = 'var(--text-secondary)';
+            btn.style.boxShadow = 'none';
+            const svg = btn.querySelector('svg');
+            if (svg) svg.style.color = 'var(--text-secondary)';
+            
+            if (mainChartContainer) mainChartContainer.style.display = 'flex';
+            // Force main chart reflow
+            lastDataSignature = ''; // Force redraw on next poll
+            setTimeout(() => {
+                if (chart) chart.resize();
+            }, 100);
+        }
+    };
+    
+    updateButtonUI();
+    
+    btn.addEventListener('click', () => {
+        anomalyEnabled = !anomalyEnabled;
+        localStorage.setItem(`anomaly_enabled_${sourceId}`, anomalyEnabled);
+        updateButtonUI();
+        // Immediately trigger poll to update visual state
+        pollDashboard();
+    });
 }
 
 // Initialise ECharts with premium dark theme configuration
@@ -77,10 +467,11 @@ function initChart(type, data) {
 
     if (!chart) {
         chart = echarts.init(chartDom);
-        // Make responsive
-        window.addEventListener('resize', () => {
+        // Make responsive using ResizeObserver
+        const resizeObserver = new ResizeObserver(() => {
             if (chart) chart.resize();
         });
+        resizeObserver.observe(chartDom);
         
         // Listen to legend selection changes and persist them
         chart.on('legendselectchanged', (params) => {
@@ -927,10 +1318,10 @@ async function pollDashboard() {
         
         if (source.active) {
             activeDot.className = 'status-dot';
-            activeText.textContent = 'リアルタイム同期中';
+            activeText.textContent = '同期中';
         } else {
             activeDot.className = 'status-dot offline';
-            activeText.textContent = '監視一時停止中';
+            activeText.textContent = '停止中';
         }
         
         dataType = source.data_type;
@@ -943,7 +1334,9 @@ async function pollDashboard() {
             if (signature !== lastDataSignature) {
                 lastDataSignature = signature;
                 updateKpiCards('environment', history[history.length - 1]);
-                initChart('environment', history);
+                if (!anomalyEnabled) {
+                    initChart('environment', history);
+                }
             }
         } else if (dataType === 'traffic') {
             document.getElementById('chart-main-title').textContent = 'ネットワークトラフィック 時系列データ';
@@ -953,7 +1346,9 @@ async function pollDashboard() {
             if (signature !== lastDataSignature) {
                 lastDataSignature = signature;
                 updateKpiCards('traffic', history[history.length - 1]);
-                initChart('traffic', history);
+                if (!anomalyEnabled) {
+                    initChart('traffic', history);
+                }
             }
         } else if (dataType === 'cpu_mem_disk') {
             document.getElementById('chart-main-title').textContent = 'システムリソース 時系列データ';
@@ -963,7 +1358,9 @@ async function pollDashboard() {
             if (signature !== lastDataSignature) {
                 lastDataSignature = signature;
                 updateKpiCards('cpu_mem_disk', history[history.length - 1]);
-                initChart('cpu_mem_disk', history);
+                if (!anomalyEnabled) {
+                    initChart('cpu_mem_disk', history);
+                }
             }
         } else if (dataType === 'process_load') {
             document.getElementById('chart-main-title').textContent = 'システム負荷・プロセス 時系列データ';
@@ -973,7 +1370,9 @@ async function pollDashboard() {
             if (signature !== lastDataSignature) {
                 lastDataSignature = signature;
                 updateKpiCards('process_load', history[history.length - 1]);
-                initChart('process_load', history);
+                if (!anomalyEnabled) {
+                    initChart('process_load', history);
+                }
             }
         } else if (dataType === 'network_speed') {
             document.getElementById('chart-main-title').textContent = 'ネットワーク通信速度 時系列データ';
@@ -983,11 +1382,81 @@ async function pollDashboard() {
             if (signature !== lastDataSignature) {
                 lastDataSignature = signature;
                 updateKpiCards('network_speed', history[history.length - 1]);
-                initChart('network_speed', history);
+                if (!anomalyEnabled) {
+                    initChart('network_speed', history);
+                }
             }
         } else {
             // Unknown datatype yet
             updateKpiCards('unknown', null);
+        }
+
+        // 異常検知表示の制御
+        const anomalyContainer = document.getElementById('anomaly-container');
+        if (anomalyContainer) {
+            if (anomalyEnabled) {
+                anomalyContainer.style.display = 'flex';
+                // APIから異常検知結果を取得
+                const anomalyResult = await window.pywebview.api.run_anomaly_detection(sourceId);
+                
+                if (anomalyResult && anomalyResult.status !== 'error') {
+                    // 最新の状態を更新
+                    const badge = document.getElementById('anomaly-status-badge');
+                    const dot = document.getElementById('anomaly-status-dot');
+                    const text = document.getElementById('anomaly-status-text');
+                    const detailMsg = document.getElementById('anomaly-detail-message');
+                    const detailSub = document.getElementById('anomaly-detail-sub');
+                    
+                    if (badge && dot && text) {
+                        text.textContent = anomalyResult.status_ja;
+                        if (anomalyResult.status === 'critical') {
+                            badge.style.background = 'rgba(239, 68, 68, 0.1)';
+                            badge.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+                            badge.style.color = '#ef4444';
+                            dot.style.background = '#ef4444';
+                            dot.style.boxShadow = '0 0 8px #ef4444';
+                        } else if (anomalyResult.status === 'warning') {
+                            badge.style.background = 'rgba(245, 158, 11, 0.1)';
+                            badge.style.borderColor = 'rgba(245, 158, 11, 0.2)';
+                            badge.style.color = 'var(--color-warning)';
+                            dot.style.background = 'var(--color-warning)';
+                            dot.style.boxShadow = '0 0 8px var(--color-warning)';
+                        } else {
+                            badge.style.background = 'rgba(16, 185, 129, 0.1)';
+                            badge.style.borderColor = 'rgba(16, 185, 129, 0.2)';
+                            badge.style.color = 'var(--color-success)';
+                            dot.style.background = 'var(--color-success)';
+                            dot.style.boxShadow = '0 0 8px var(--color-success)';
+                        }
+                    }
+                    
+                    if (detailMsg) detailMsg.textContent = anomalyResult.message;
+                    if (detailSub) {
+                        if (anomalyResult.latest_detail && anomalyResult.latest_detail.val !== null) {
+                            detailSub.textContent = `現在値: ${anomalyResult.latest_detail.val.toFixed(2)}`;
+                        } else {
+                            detailSub.textContent = '';
+                        }
+                    }
+                    
+                    // 判定履歴または折れ線グラフの描画
+                    if (anomalyResult.scores && anomalyResult.scores.length > 0) {
+                        if (anomalyViewMode === 'tiles') {
+                            updateAnomalyHistoryGrid(anomalyResult);
+                        } else {
+                            const sig = `${anomalyResult.scores.length}_${anomalyResult.timestamps[anomalyResult.timestamps.length - 1]}`;
+                            if (sig !== lastAnomalySignature) {
+                                lastAnomalySignature = sig;
+                                initAnomalyChart(anomalyResult);
+                            }
+                        }
+                    }
+                } else {
+                    document.getElementById('anomaly-detail-message').textContent = anomalyResult ? anomalyResult.message : '異常検知APIの取得に失敗しました';
+                }
+            } else {
+                anomalyContainer.style.display = 'none';
+            }
         }
     } catch(err) {
         console.error("Dashboard polling error:", err);
@@ -996,9 +1465,18 @@ async function pollDashboard() {
 
 // Start polling
 window.addEventListener('pywebviewready', () => {
+    setupAnomalyViewMode();
+    setupAnomalyToggle();
     pollDashboard();
     // Refresh every 2 seconds
     setInterval(pollDashboard, 2000);
+    
+    // Recalculate tiles grid dynamically on window resize
+    window.addEventListener('resize', () => {
+        if (anomalyEnabled && anomalyViewMode === 'tiles') {
+            pollDashboard();
+        }
+    });
 });
 
 // Window control actions
@@ -1066,6 +1544,9 @@ function setupWindowResize() {
                 if (window.pywebview && window.pywebview.api && sourceId) {
                     window.pywebview.api.resize_dashboard(sourceId, currentWidth, currentHeight);
                 }
+                if (chart) chart.resize();
+                if (anomalyChart && anomalyViewMode === 'chart') anomalyChart.resize();
+                if (anomalyEnabled && anomalyViewMode === 'tiles') pollDashboard();
                 resizePending = false;
             });
         }

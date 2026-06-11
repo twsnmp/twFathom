@@ -1,13 +1,18 @@
 import os
+import time
+import threading
 import webview
 from . import db
 from . import collectors
+from . import anomaly
 
 class Bridge:
     def __init__(self, main_window=None):
         self._main_window = main_window
         self._dashboard_windows = {}
         self._main_window_closing = False
+        self._anomaly_baselines = {}
+        self._anomaly_baselines_lock = threading.Lock()
 
     def get_sources(self):
         return db.get_sources()
@@ -343,3 +348,84 @@ class Bridge:
             db.save_window_state(f"dashboard_{source_id}", ix, iy, iw, ih, 1)
         except Exception as e:
             print(f"Error applying layout for window {source_id}: {e}")
+
+    def run_anomaly_detection(self, source_id):
+        """
+        指定されたデータソースの履歴データを取得し、過去すべてのデータをもとに異常検知アルゴリズムを実行します。
+        パフォーマンス向上のため、過去すべての統計値はSQLiteで計算されバックグラウンドでキャッシュされます。
+        """
+        try:
+            source = db.get_source(source_id)
+            if not source:
+                return {"status": "error", "message": "データソースが見つかりません"}
+                
+            data_type = source.get('data_type')
+            limit = -1  # 全期間の履歴を使用 (制限なし)
+            
+            # キャッシュされた過去すべての基準統計情報を取得
+            baseline_stats = self._get_cached_baseline(source_id, data_type)
+            
+            if data_type == 'environment':
+                history = db.get_environment_history(source_id, limit)
+            elif data_type == 'traffic':
+                history = db.get_traffic_history(source_id, limit)
+            elif data_type == 'cpu_mem_disk':
+                history = db.get_cpu_mem_disk_history(source_id, limit)
+            elif data_type == 'process_load':
+                history = db.get_process_load_history(source_id, limit)
+            elif data_type == 'network_speed':
+                history = db.get_network_speed_history(source_id, limit)
+            else:
+                return {"status": "error", "message": f"未対応のデータタイプです: {data_type}"}
+                
+            # 計算の実行（基準統計がある場合はそれを使用、ない場合は直近データから計算）
+            result = anomaly.calculate_anomaly(history, data_type, baseline_stats=baseline_stats)
+            return result
+        except Exception as e:
+            import traceback
+            print(f"Error in run_anomaly_detection: {e}")
+            traceback.print_exc()
+            return {"status": "error", "message": str(e)}
+
+    def _get_cached_baseline(self, source_id, data_type):
+        key = (source_id, data_type)
+        now = time.time()
+        
+        with self._anomaly_baselines_lock:
+            entry = self._anomaly_baselines.get(key)
+            if entry:
+                stats, last_computed, is_computing = entry
+                # 5分以上経過しており、かつ現在計算中でなければバックグラウンドスレッドで更新を開始
+                if now - last_computed > 300 and not is_computing:
+                    self._anomaly_baselines[key] = (stats, last_computed, True)
+                    threading.Thread(
+                        target=self._bg_compute_baseline,
+                        args=(source_id, data_type),
+                        daemon=True
+                    ).start()
+                return stats
+            else:
+                # 初回：計算中フラグを立ててバックグラウンドスレッドを起動し、一旦Noneを返す（直近データでの算出にフォールバック）
+                self._anomaly_baselines[key] = (None, 0, True)
+                threading.Thread(
+                    target=self._bg_compute_baseline,
+                    args=(source_id, data_type),
+                    daemon=True
+                ).start()
+                return None
+
+    def _bg_compute_baseline(self, source_id, data_type):
+        try:
+            # SQLiteウィンドウ関数を用いて過去すべての統計情報（平均・不偏分散）を計算
+            stats = db.get_baseline_stats(source_id, data_type)
+            
+            with self._anomaly_baselines_lock:
+                self._anomaly_baselines[(source_id, data_type)] = (stats, time.time(), False)
+        except Exception as e:
+            print(f"Error in _bg_compute_baseline for source_id={source_id}, type={data_type}: {e}")
+            with self._anomaly_baselines_lock:
+                # エラー時は計算中フラグを下ろす
+                entry = self._anomaly_baselines.get((source_id, data_type))
+                if entry:
+                    stats, last_computed, _ = entry
+                    self._anomaly_baselines[(source_id, data_type)] = (stats, last_computed, False)
