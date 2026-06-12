@@ -5,6 +5,11 @@ from . import collectors
 from .bridge import Bridge
 
 def main():
+    # Force X11 backend on Wayland to allow absolute window positioning (auto-arrange)
+    if os.environ.get('XDG_SESSION_TYPE') == 'wayland' or 'WAYLAND_DISPLAY' in os.environ:
+        if 'GDK_BACKEND' not in os.environ:
+            os.environ['GDK_BACKEND'] = 'x11'
+
     # Initialize SQLite database
     db.init_db()
     

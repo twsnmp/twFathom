@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import threading
 import webview
@@ -130,7 +131,7 @@ class Bridge:
             y=y,
             resizable=True,
             frameless=True,
-            easy_drag=False,
+            easy_drag=sys.platform.startswith('linux'),
             js_api=self
         )
         self._dashboard_windows[source_id] = sub_window
@@ -140,10 +141,24 @@ class Bridge:
             if source_id not in self._dashboard_windows:
                 return
             try:
-                win_x = sub_window.x
-                win_y = sub_window.y
-                win_w = sub_window.width
-                win_h = sub_window.height
+                state_now = db.get_window_state(f"dashboard_{source_id}")
+                if state_now and isinstance(state_now, dict):
+                    win_x = state_now.get('x')
+                    win_y = state_now.get('y')
+                    win_w = state_now.get('width', 640)
+                    win_h = state_now.get('height', 480)
+                else:
+                    # Fallback for tests/environments where db is mocked or empty
+                    try:
+                        win_x = sub_window.x
+                        win_y = sub_window.y
+                        win_w = sub_window.width
+                        win_h = sub_window.height
+                    except Exception:
+                        win_x = None
+                        win_y = None
+                        win_w = 640
+                        win_h = 480
                 is_open = 1 if self._main_window_closing else 0
                 db.save_window_state(f"dashboard_{source_id}", win_x, win_y, win_w, win_h, is_open)
             except Exception as e:
@@ -153,6 +168,21 @@ class Bridge:
                 del self._dashboard_windows[source_id]
 
         sub_window.events.closing += on_closing
+
+        def on_moved(wx, wy):
+            try:
+                self._update_window_coords(source_id, x=int(wx), y=int(wy))
+            except Exception as e:
+                print(f"Error in on_moved event: {e}")
+                
+        def on_resized(ww, wh):
+            try:
+                self._update_window_coords(source_id, width=int(ww), height=int(wh))
+            except Exception as e:
+                print(f"Error in on_resized event: {e}")
+
+        sub_window.events.moved += on_moved
+        sub_window.events.resized += on_resized
 
     def toggle_dashboard(self, source_id):
         if source_id in self._dashboard_windows:
@@ -183,11 +213,19 @@ class Bridge:
         win = self._dashboard_windows.get(source_id)
         if win:
             try:
-                # Save size and position, and update open status synchronously
-                win_x = win.x
-                win_y = win.y
-                win_w = win.width
-                win_h = win.height
+                # Save size and position, and update open status from database state
+                state = db.get_window_state(f"dashboard_{source_id}")
+                if state and isinstance(state, dict):
+                    win_x = state.get('x')
+                    win_y = state.get('y')
+                    win_w = state.get('width', 640)
+                    win_h = state.get('height', 480)
+                else:
+                    # Fallback for tests/environments where db is mocked
+                    win_x = win.x
+                    win_y = win.y
+                    win_w = win.width
+                    win_h = win.height
                 is_open = 1 if is_app_exiting else 0
                 db.save_window_state(f"dashboard_{source_id}", win_x, win_y, win_w, win_h, is_open)
             except Exception as e:
@@ -219,11 +257,18 @@ class Bridge:
         open_wins = []
         for source_id, win in list(self._dashboard_windows.items()):
             try:
-                # verify window is active/accessible
-                wx, wy = win.x, win.y
+                # verify window is active/accessible using database state to avoid thread safety issues
+                state = db.get_window_state(f"dashboard_{source_id}")
+                if state and isinstance(state, dict):
+                    wx = state.get('x') or 0
+                    wy = state.get('y') or 0
+                else:
+                    # Fallback for unit tests where db is mocked
+                    wx = win.x
+                    wy = win.y
                 open_wins.append((source_id, win, wx, wy))
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Error checking window state for source_id {source_id}: {e}")
                 
         target_screen = self._get_target_screen()
         sx, sy, sw, sh = self._get_screen_geometry(target_screen)
@@ -429,3 +474,15 @@ class Bridge:
                 if entry:
                     stats, last_computed, _ = entry
                     self._anomaly_baselines[(source_id, data_type)] = (stats, last_computed, False)
+
+    def _update_window_coords(self, source_id, x=None, y=None, width=None, height=None):
+        state = db.get_window_state(f"dashboard_{source_id}")
+        if not state:
+            state = {'x': None, 'y': None, 'width': 640, 'height': 480}
+        
+        new_x = x if x is not None else state.get('x')
+        new_y = y if y is not None else state.get('y')
+        new_w = width if width is not None else state.get('width', 640)
+        new_h = height if height is not None else state.get('height', 480)
+        
+        db.save_window_state(f"dashboard_{source_id}", new_x, new_y, new_w, new_h, 1)
