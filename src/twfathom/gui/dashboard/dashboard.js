@@ -11,6 +11,27 @@ let lastAnomalySignature = '';
 const urlParams = new URLSearchParams(window.location.search);
 sourceId = parseInt(urlParams.get('id'), 10);
 
+// Safe localStorage wrapper to prevent crash on platforms with restricted access (e.g., Linux WebKitGTK)
+const safeStorage = {
+    _data: {},
+    getItem(key) {
+        try {
+            return window.localStorage.getItem(key);
+        } catch (e) {
+            console.warn("localStorage is not accessible, using in-memory fallback:", e);
+            return this._data[key] || null;
+        }
+    },
+    setItem(key, value) {
+        try {
+            window.localStorage.setItem(key, value);
+        } catch (e) {
+            console.warn("localStorage is not accessible, using in-memory fallback:", e);
+            this._data[key] = value;
+        }
+    }
+};
+
 function formatBytes(bytes) {
     if (bytes === null || bytes === undefined || isNaN(bytes)) return { value: '0', unit: 'bps' };
     if (bytes < 1000) return { value: bytes.toFixed(1), unit: 'bps' };
@@ -337,7 +358,7 @@ function setupAnomalyViewMode() {
     const btnChart = document.getElementById('btn-view-chart');
     if (!btnTiles || !btnChart) return;
     
-    const savedMode = localStorage.getItem(`anomaly_view_mode_${sourceId}`);
+    const savedMode = safeStorage.getItem(`anomaly_view_mode_${sourceId}`);
     anomalyViewMode = savedMode || 'tiles';
     
     const updateViewUI = () => {
@@ -366,14 +387,14 @@ function setupAnomalyViewMode() {
     
     btnTiles.addEventListener('click', () => {
         anomalyViewMode = 'tiles';
-        localStorage.setItem(`anomaly_view_mode_${sourceId}`, 'tiles');
+        safeStorage.setItem(`anomaly_view_mode_${sourceId}`, 'tiles');
         updateViewUI();
         pollDashboard();
     });
     
     btnChart.addEventListener('click', () => {
         anomalyViewMode = 'chart';
-        localStorage.setItem(`anomaly_view_mode_${sourceId}`, 'chart');
+        safeStorage.setItem(`anomaly_view_mode_${sourceId}`, 'chart');
         updateViewUI();
         pollDashboard();
     });
@@ -385,7 +406,7 @@ function setupAnomalyToggle() {
     if (!btn) return;
     
     // Load state from localStorage
-    const saved = localStorage.getItem(`anomaly_enabled_${sourceId}`);
+    const saved = safeStorage.getItem(`anomaly_enabled_${sourceId}`);
     anomalyEnabled = (saved === 'true');
     
     const updateButtonUI = () => {
@@ -420,7 +441,7 @@ function setupAnomalyToggle() {
     
     btn.addEventListener('click', () => {
         anomalyEnabled = !anomalyEnabled;
-        localStorage.setItem(`anomaly_enabled_${sourceId}`, anomalyEnabled);
+        safeStorage.setItem(`anomaly_enabled_${sourceId}`, anomalyEnabled);
         updateButtonUI();
         // Immediately trigger poll to update visual state
         pollDashboard();
@@ -440,7 +461,7 @@ function initChart(type, data) {
     
     // Load from localStorage
     try {
-        const savedStr = localStorage.getItem(`legend_selected_${sourceId}_${dataType}`);
+        const savedStr = safeStorage.getItem(`legend_selected_${sourceId}_${dataType}`);
         if (savedStr) {
             savedLegend = JSON.parse(savedStr);
         }
@@ -476,7 +497,7 @@ function initChart(type, data) {
         // Listen to legend selection changes and persist them
         chart.on('legendselectchanged', (params) => {
             try {
-                localStorage.setItem(`legend_selected_${sourceId}_${dataType}`, JSON.stringify(params.selected));
+                safeStorage.setItem(`legend_selected_${sourceId}_${dataType}`, JSON.stringify(params.selected));
             } catch (e) {
                 console.error("Error saving legend selection:", e);
             }
@@ -590,7 +611,7 @@ function initChart(type, data) {
         const otherKeys = ['soil_moisture', 'pressure', 'co2', 'illuminance'];
         const availableKeys = otherKeys.filter(key => data.some(d => d[key] !== null && d[key] !== undefined));
         
-        let activeOtherKey = localStorage.getItem(`active_right_axis_${sourceId}`);
+        let activeOtherKey = safeStorage.getItem(`active_right_axis_${sourceId}`);
         if (!activeOtherKey || !availableKeys.includes(activeOtherKey)) {
             activeOtherKey = availableKeys[0] || null;
         }
@@ -612,7 +633,7 @@ function initChart(type, data) {
                 controlsDom.querySelectorAll('.pill-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => {
                         const selectedKey = e.target.getAttribute('data-key');
-                        localStorage.setItem(`active_right_axis_${sourceId}`, selectedKey);
+                        safeStorage.setItem(`active_right_axis_${sourceId}`, selectedKey);
                         lastDataSignature = ''; // Reset signature to force redraw
                         pollDashboard();
                     });
@@ -1463,22 +1484,6 @@ async function pollDashboard() {
     }
 }
 
-// Start polling
-window.addEventListener('pywebviewready', () => {
-    setupAnomalyViewMode();
-    setupAnomalyToggle();
-    pollDashboard();
-    // Refresh every 2 seconds
-    setInterval(pollDashboard, 2000);
-    
-    // Recalculate tiles grid dynamically on window resize
-    window.addEventListener('resize', () => {
-        if (anomalyEnabled && anomalyViewMode === 'tiles') {
-            pollDashboard();
-        }
-    });
-});
-
 // Window control actions
 function closeDashboardWindow() {
     if (window.pywebview && window.pywebview.api && sourceId) {
@@ -1559,7 +1564,26 @@ function setupWindowResize() {
     }
 }
 
-// Call setupWindowResize on pywebviewready
-window.addEventListener('pywebviewready', () => {
+// Initial Loading
+function initDashboard() {
+    setupAnomalyViewMode();
+    setupAnomalyToggle();
+    pollDashboard();
+    // Refresh every 2 seconds
+    setInterval(pollDashboard, 2000);
+    
+    // Recalculate tiles grid dynamically on window resize
+    window.addEventListener('resize', () => {
+        if (anomalyEnabled && anomalyViewMode === 'tiles') {
+            pollDashboard();
+        }
+    });
+    
     setupWindowResize();
-});
+}
+
+if (window.pywebview && window.pywebview.api) {
+    initDashboard();
+} else {
+    window.addEventListener('pywebviewready', initDashboard);
+}

@@ -281,7 +281,13 @@ function autoArrange() {
 }
 
 // Initial Loading
-window.addEventListener('pywebviewready', () => {
+function initMainConsole() {
     loadSources();
     setInterval(loadSources, 3000);
-});
+}
+
+if (window.pywebview && window.pywebview.api) {
+    initMainConsole();
+} else {
+    window.addEventListener('pywebviewready', initMainConsole);
+}
