@@ -147,18 +147,18 @@ class Bridge:
                     win_y = state_now.get('y')
                     win_w = state_now.get('width', 640)
                     win_h = state_now.get('height', 480)
+                elif state_now is None:
+                    # In production, if no state in DB, use default None/640/480
+                    win_x = None
+                    win_y = None
+                    win_w = 640
+                    win_h = 480
                 else:
-                    # Fallback for tests/environments where db is mocked or empty
-                    try:
-                        win_x = sub_window.x
-                        win_y = sub_window.y
-                        win_w = sub_window.width
-                        win_h = sub_window.height
-                    except Exception:
-                        win_x = None
-                        win_y = None
-                        win_w = 640
-                        win_h = 480
+                    # Fallback for unit tests where db is mocked
+                    win_x = sub_window.x
+                    win_y = sub_window.y
+                    win_w = sub_window.width
+                    win_h = sub_window.height
                 is_open = 1 if self._main_window_closing else 0
                 db.save_window_state(f"dashboard_{source_id}", win_x, win_y, win_w, win_h, is_open)
             except Exception as e:
@@ -220,6 +220,12 @@ class Bridge:
                     win_y = state.get('y')
                     win_w = state.get('width', 640)
                     win_h = state.get('height', 480)
+                elif state is None:
+                    # In production, if no state in DB, use default None/640/480
+                    win_x = None
+                    win_y = None
+                    win_w = 640
+                    win_h = 480
                 else:
                     # Fallback for tests/environments where db is mocked
                     win_x = win.x
@@ -262,6 +268,10 @@ class Bridge:
                 if state and isinstance(state, dict):
                     wx = state.get('x') or 0
                     wy = state.get('y') or 0
+                elif state is None:
+                    # In production, if no state in DB, use default 0
+                    wx = 0
+                    wy = 0
                 else:
                     # Fallback for unit tests where db is mocked
                     wx = win.x
@@ -486,3 +496,22 @@ class Bridge:
         new_h = height if height is not None else state.get('height', 480)
         
         db.save_window_state(f"dashboard_{source_id}", new_x, new_y, new_w, new_h, 1)
+
+    def get_window_position_from_db(self, source_id):
+        try:
+            state = db.get_window_state(f"dashboard_{source_id}")
+            if state and isinstance(state, dict):
+                return {"x": state.get('x') or 0, "y": state.get('y') or 0}
+        except Exception as e:
+            print(f"Error in get_window_position_from_db: {e}")
+        return {"x": 0, "y": 0}
+
+    def move_dashboard(self, source_id, x, y):
+        win = self._dashboard_windows.get(source_id)
+        if win:
+            try:
+                win.move(int(x), int(y))
+                # Explicitly update coordinates cache in DB
+                self._update_window_coords(source_id, x=int(x), y=int(y))
+            except Exception as e:
+                print(f"Error moving window: {e}")
