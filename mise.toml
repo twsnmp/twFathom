@@ -32,6 +32,10 @@ if [[ ! "$VERSION" =~ ^[0-9] ]]; then
 fi
 chmod -R a+rX src/ tests/
 .venv/bin/briefcase build -C "version=\\"$VERSION\\""
+if [ -d "build/twfathom/macos/app" ]; then
+    echo "Fixing file permissions inside the macOS build directory..."
+    chmod -R a+rX build/twfathom/macos/app
+fi
 """
 
 [tasks.dev]
@@ -56,6 +60,9 @@ chmod -R a+rX src/ tests/
 echo "Building version $VERSION for macOS..."
 .venv/bin/briefcase build macOS --no-input -C "version=\\"$VERSION\\""
 
+echo "Fixing permissions of built files in macOS build directory..."
+chmod -R a+rX build/twfathom/macos/app
+
 echo "Cleaning up problematic object files for notarization..."
 # Delete any .o files in the Python framework that cause notarization failures
 find build/twfathom/macos/app/twFathom.app -name "*.o" -delete
@@ -64,6 +71,9 @@ echo "Injecting custom installer welcome screen and icon..."
 mkdir -p build/twfathom/macos/app/installer/resources
 cp src/twfathom/resources/welcome.html build/twfathom/macos/app/installer/resources/welcome.html
 cp src/twfathom/resources/installer_icon.png build/twfathom/macos/app/installer/resources/installer_icon.png
+
+echo "Ensuring final staging files are also fully readable..."
+chmod -R a+rX build/twfathom/macos/app
 
 if [ -n "$APP_ID" ] && [ -n "$INST_ID" ]; then
     .venv/bin/briefcase package macOS -p pkg --identity "$APP_ID" --installer-identity "$INST_ID" -C "version=\\"$VERSION\\""
