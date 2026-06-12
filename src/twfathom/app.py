@@ -10,6 +10,11 @@ def main():
         if 'GDK_BACKEND' not in os.environ:
             os.environ['GDK_BACKEND'] = 'x11'
 
+    # If GDK_BACKEND is x11, disable WebKit compositing/DMABUF to prevent black screens
+    if os.environ.get('GDK_BACKEND') == 'x11':
+        os.environ['WEBKIT_DISABLE_COMPOSITING_MODE'] = '1'
+        os.environ['WEBKIT_DISABLE_DMABUF_RENDERER'] = '1'
+
     # Initialize SQLite database
     db.init_db()
     

@@ -131,7 +131,7 @@ class Bridge:
             y=y,
             resizable=True,
             frameless=True,
-            easy_drag=sys.platform.startswith('linux'),
+            easy_drag=False,
             js_api=self
         )
         self._dashboard_windows[source_id] = sub_window
@@ -515,3 +515,29 @@ class Bridge:
                 self._update_window_coords(source_id, x=int(x), y=int(y))
             except Exception as e:
                 print(f"Error moving window: {e}")
+
+    def start_drag(self, source_id, button, screen_x, screen_y, timestamp):
+        if not sys.platform.startswith('linux'):
+            return
+        win = self._dashboard_windows.get(source_id)
+        if win:
+            try:
+                from gi.repository import GLib, Gtk
+                def _do_drag():
+                    try:
+                        gtk_win = getattr(win, 'native', None)
+                        if gtk_win:
+                            event_time = Gtk.get_current_event_time()
+                            if event_time == 0:
+                                event_time = int(timestamp) or 0
+                            gtk_win.begin_move_drag(
+                                int(button) + 1,  # GTK button is 1-based (left=1)
+                                int(screen_x),
+                                int(screen_y),
+                                event_time
+                            )
+                    except Exception as ex:
+                        print(f"Error in GTK begin_move_drag: {ex}")
+                GLib.idle_add(_do_drag)
+            except Exception as e:
+                print(f"Error starting native GTK drag: {e}")

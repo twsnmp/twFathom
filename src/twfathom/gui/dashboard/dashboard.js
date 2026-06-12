@@ -1597,59 +1597,22 @@ function setupWindowDrag() {
     const dragRegion = document.querySelector('.pywebview-drag-region');
     if (!dragRegion) return;
 
-    let isDragging = false;
-    let startMouseX = 0;
-    let startMouseY = 0;
-    let startWinX = 0;
-    let startWinY = 0;
-    let currentX = 0;
-    let currentY = 0;
-    let dragPending = false;
-
     dragRegion.addEventListener('mousedown', (e) => {
         if (e.button !== 0) return; // Left click only
         if (e.target.closest('button') || e.target.closest('.status-pill') || e.target.closest('a')) {
             return; // Ignore button and link clicks
         }
 
-        isDragging = true;
-        startMouseX = e.screenX;
-        startMouseY = e.screenY;
-
-        if (window.pywebview && window.pywebview.api) {
-            window.pywebview.api.get_window_position_from_db(sourceId).then(pos => {
-                if (!isDragging) return;
-                startWinX = pos.x;
-                startWinY = pos.y;
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
-            });
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.start_drag) {
+            e.preventDefault();
+            window.pywebview.api.start_drag(
+                sourceId,
+                e.button,
+                e.screenX,
+                e.screenY,
+                Math.round(e.timeStamp)
+            );
         }
     });
-
-    function onMouseMove(e) {
-        if (!isDragging) return;
-        const dx = e.screenX - startMouseX;
-        const dy = e.screenY - startMouseY;
-
-        currentX = startWinX + dx;
-        currentY = startWinY + dy;
-
-        if (!dragPending) {
-            dragPending = true;
-            requestAnimationFrame(() => {
-                if (window.pywebview && window.pywebview.api) {
-                    window.pywebview.api.move_dashboard(sourceId, currentX, currentY);
-                }
-                dragPending = false;
-            });
-        }
-    }
-
-    function onMouseUp() {
-        isDragging = false;
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-    }
 }
 
