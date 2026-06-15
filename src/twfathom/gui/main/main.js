@@ -3,6 +3,8 @@ const form = document.getElementById('source-form');
 const formSourceId = document.getElementById('form-source-id');
 const modalTitle = document.getElementById('modal-title');
 
+let currentSources = [];
+
 function openAddModal() {
     form.reset();
     formSourceId.value = '';
@@ -13,30 +15,33 @@ function openAddModal() {
     modal.style.display = 'flex';
 }
 
-function openEditModal(id, name, type, configStr, interval, dataType) {
+function openEditModal(id) {
+    const src = currentSources.find(s => s.id === id);
+    if (!src) return;
+
     modalTitle.textContent = 'ソースの編集';
-    formSourceId.value = id;
-    document.getElementById('form-name').value = name;
-    document.getElementById('form-type').value = type;
-    document.getElementById('form-interval').value = interval;
-    document.getElementById('form-data-type').value = dataType || 'unknown';
+    formSourceId.value = src.id;
+    document.getElementById('form-name').value = src.name;
+    document.getElementById('form-type').value = src.type;
+    document.getElementById('form-interval').value = src.interval;
+    document.getElementById('form-data-type').value = src.data_type || 'unknown';
     
     handleTypeChange();
     
-    const config = JSON.parse(configStr);
+    const config = src.config || {};
     
-    if (type === 'mqtt') {
+    if (src.type === 'mqtt') {
         document.getElementById('mqtt-broker').value = config.broker || '';
         document.getElementById('mqtt-port').value = config.port || 1883;
         document.getElementById('mqtt-topic').value = config.topic || '';
         document.getElementById('mqtt-username').value = config.username || '';
         document.getElementById('mqtt-password').value = config.password || '';
-    } else if (type === 'https') {
+    } else if (src.type === 'https') {
         document.getElementById('https-url').value = config.url || '';
         document.getElementById('https-method').value = config.method || 'GET';
         document.getElementById('https-headers').value = config.headers ? JSON.stringify(config.headers) : '';
         document.getElementById('https-params').value = config.params ? JSON.stringify(config.params) : '';
-    } else if (type === 'file') {
+    } else if (src.type === 'file') {
         document.getElementById('file-path').value = config.filepath || '';
     }
     
@@ -146,6 +151,7 @@ async function loadSources() {
     
     try {
         const sources = await window.pywebview.api.get_sources();
+        currentSources = sources;
         const openDashboards = await window.pywebview.api.get_open_dashboards();
         const tbody = document.getElementById('source-list');
         const noDataMsg = document.getElementById('no-data-msg');
@@ -176,9 +182,6 @@ async function loadSources() {
             const activeBadgeClass = src.active ? 'badge-active' : 'badge-paused';
             const activeText = src.active ? '監視中' : '一時停止';
             
-            // Safe JSON config for onclick injection
-            const safeConfig = JSON.stringify(src.config).replace(/"/g, '&quot;');
-            
             // Check if dashboard is currently open
             const isDashboardOpen = openDashboards.includes(src.id);
             const dashboardBtnClass = isDashboardOpen ? 'icon-btn-active' : 'icon-btn-primary';
@@ -201,7 +204,7 @@ async function loadSources() {
                                 `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`
                             }
                         </button>
-                        <button class="icon-btn" title="編集" onclick="openEditModal(${src.id}, '${escapeQuote(src.name)}', '${src.type}', '${safeConfig}', ${src.interval}, '${src.data_type}')">
+                        <button class="icon-btn" title="編集" onclick="openEditModal(${src.id})">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
                         </button>
                         <button class="icon-btn icon-btn-danger" title="データ履歴をクリア" onclick="clearSourceData(${src.id})">
@@ -268,10 +271,6 @@ function escapeHtml(str) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
-}
-
-function escapeQuote(str) {
-    return str.replace(/'/g, "\\'");
 }
 
 function autoArrange() {
