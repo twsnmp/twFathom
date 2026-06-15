@@ -213,3 +213,5 @@ __marimo__/
 logs/
 scratch/
 *.dist-info/
+
+.DS_Store
