@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-06-22
+
+### Added
+- **バージョンおよびGitコミットハッシュの表示**: 起動時のメインUI上にバージョン番号とGitコミットハッシュを表示する機能を追加。
+- **SQLiteデータベースのロック競合防止**: WAL（Write-Ahead Logging）モードを有効化し、データベース接続時のタイムアウト設定を延長することで、ロック競合エラー（database is locked）を防止。
+- **Linuxダッシュボードのドラッグ・レイアウトのネイティブ化および描画バグ修正**: Linux環境でJSによるダッシュボードドラッグ移動機能のネイティブGTK化（easy_drag）を適用し、x11バックエンドでの黒画面バグ修正、Waylandでのx11バックエンド設定（GDK_BACKEND=x11）、スレッドセーフなウィンドウ自動整列（Auto-Arrange）を実装。
+
+### Fixed
+- **JavaScriptにおけるエスケープ処理の修正**: `main.js`における文字列エスケープ処理の不備（CodeQL警告）を修正。
+- **macOSパッケージ起動エラーの解決**: macOS向けのbuild/release-macタスク実行時に発生するファイル権限問題を修正し、起動時のPermissionErrorを解消。
+- **Linuxダッシュボード起動競合の解消**: pywebviewreadyイベントの競合回避、およびローカルストレージのフォールバック処理追加によるダッシュボード読み込みエラーの解決。
+
 ## [0.1.0] - 2026-06-12
 
 ### Added

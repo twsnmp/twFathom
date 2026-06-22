@@ -17,7 +17,7 @@ class Bridge:
 
     def get_version_info(self):
         import subprocess
-        version = "0.1.0"
+        version = "0.2.0"
         commit = "unknown"
         try:
             from . import __version__
