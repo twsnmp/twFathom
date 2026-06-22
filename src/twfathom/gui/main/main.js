@@ -279,10 +279,28 @@ function autoArrange() {
     }
 }
 
+async function showVersionInfo() {
+    if (!window.pywebview || !window.pywebview.api) return;
+    try {
+        const info = await window.pywebview.api.get_version_info();
+        const versionEl = document.getElementById('version-info');
+        if (versionEl) {
+            if (info.commit && info.commit !== 'unknown') {
+                versionEl.textContent = `${info.version} (${info.commit})`;
+            } else {
+                versionEl.textContent = info.version;
+            }
+        }
+    } catch (err) {
+        console.error("Failed to get version info:", err);
+    }
+}
+
 // Initial Loading
 function initMainConsole() {
     loadSources();
     setInterval(loadSources, 3000);
+    showVersionInfo();
 }
 
 if (window.pywebview && window.pywebview.api) {

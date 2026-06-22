@@ -15,6 +15,26 @@ class Bridge:
         self._anomaly_baselines = {}
         self._anomaly_baselines_lock = threading.Lock()
 
+    def get_version_info(self):
+        import subprocess
+        version = "0.1.0"
+        commit = "unknown"
+        try:
+            from . import __version__
+            version = __version__
+        except ImportError:
+            pass
+        try:
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            commit = subprocess.check_output(
+                ["git", "rev-parse", "--short", "HEAD"],
+                cwd=base_dir,
+                stderr=subprocess.DEVNULL
+            ).decode("utf-8").strip()
+        except Exception:
+            commit = "unknown"
+        return {"version": version, "commit": commit}
+
     def get_sources(self):
         return db.get_sources()
 
