@@ -145,9 +145,13 @@ async function saveSource(event) {
     }
 }
 
+let isSourcesLoading = false;
+
 // Load and render sources
 async function loadSources() {
     if (!window.pywebview || !window.pywebview.api) return;
+    if (isSourcesLoading) return;
+    isSourcesLoading = true;
     
     try {
         const sources = await window.pywebview.api.get_sources();
@@ -220,6 +224,8 @@ async function loadSources() {
         });
     } catch (err) {
         console.error("Failed to load sources:", err);
+    } finally {
+        isSourcesLoading = false;
     }
 }
 
@@ -296,10 +302,15 @@ async function showVersionInfo() {
     }
 }
 
+// Periodic polling
+async function pollSources() {
+    await loadSources();
+    setTimeout(pollSources, 10000);
+}
+
 // Initial Loading
 function initMainConsole() {
-    loadSources();
-    setInterval(loadSources, 3000);
+    pollSources();
     showVersionInfo();
 }
 

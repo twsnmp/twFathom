@@ -1314,9 +1314,13 @@ function updateKpiCards(type, latestData) {
     }
 }
 
+let isDashboardPolling = false;
+
 // Fetch dashboard data periodically
 async function pollDashboard() {
     if (!window.pywebview || !window.pywebview.api || !sourceId) return;
+    if (isDashboardPolling) return;
+    isDashboardPolling = true;
     
     try {
         const source = await window.pywebview.api.get_source(sourceId);
@@ -1481,6 +1485,8 @@ async function pollDashboard() {
         }
     } catch(err) {
         console.error("Dashboard polling error:", err);
+    } finally {
+        isDashboardPolling = false;
     }
 }
 
@@ -1564,13 +1570,17 @@ function setupWindowResize() {
     }
 }
 
+// Periodic polling
+async function startDashboardPolling() {
+    await pollDashboard();
+    setTimeout(startDashboardPolling, 5000);
+}
+
 // Initial Loading
 function initDashboard() {
     setupAnomalyViewMode();
     setupAnomalyToggle();
-    pollDashboard();
-    // Refresh every 2 seconds
-    setInterval(pollDashboard, 2000);
+    startDashboardPolling();
     
     // Recalculate tiles grid dynamically on window resize
     window.addEventListener('resize', () => {
