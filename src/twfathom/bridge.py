@@ -288,15 +288,21 @@ class Bridge:
                 if state and isinstance(state, dict):
                     wx = state.get('x') or 0
                     wy = state.get('y') or 0
+                    ww = state.get('width') or 640
+                    wh = state.get('height') or 480
                 elif state is None:
-                    # In production, if no state in DB, use default 0
+                    # In production, if no state in DB, use default 0/640/480
                     wx = 0
                     wy = 0
+                    ww = 640
+                    wh = 480
                 else:
                     # Fallback for unit tests where db is mocked
                     wx = win.x
                     wy = win.y
-                open_wins.append((source_id, win, wx, wy))
+                    ww = win.width
+                    wh = win.height
+                open_wins.append((source_id, win, wx, wy, ww, wh))
             except Exception as e:
                 print(f"Error checking window state for source_id {source_id}: {e}")
                 
@@ -326,18 +332,17 @@ class Bridge:
             return
 
         # Sort by y first, then x to find top-left closest window
+        # item[3] is wy, item[2] is wx
         open_wins.sort(key=lambda item: (item[3], item[2]))
         
         # Base window is the first in the sorted list (closest to top-left)
-        base_id, base_win, base_x, base_y = open_wins[0]
-        base_w = base_win.width
-        base_h = base_win.height
+        base_id, base_win, base_x, base_y, base_w, base_h = open_wins[0]
         
         gap = 10
         curr_x = base_x
         curr_y = base_y
         
-        for i, (source_id, win, wx, wy) in enumerate(open_wins):
+        for i, (source_id, win, wx, wy, ww, wh) in enumerate(open_wins):
             if i == 0:
                 # Base window stays at its current position
                 self._apply_and_save_layout(win, source_id, base_x, base_y, base_w, base_h)
