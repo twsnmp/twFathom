@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-07-01
+
+### Added
+- **窓開閉センサー（contact）対応**: Zigbee等の窓開閉センサーデータ（contact/battery/device_temperature/linkquality等）の収集・グラフ描画・KPIカード表示・異常検知に対応。`contact=true`（閉）を1、`contact=false`（開）を0として可視化。
+
+### Fixed
+- **ダッシュボードのスレッドセーフ修正**: `auto_arrange_dashboards`においてウィンドウサイズをDBステートから取得するよう変更し、スレッド競合問題を解消。
+- **タイマーのスレッドリーク・ハング修正**: `setInterval`を再帰的`setTimeout`＋排他フラグに置き換え、スレッドリークおよびハングアップを防止。
+
 ## [0.2.0] - 2026-06-22
 
 ### Added

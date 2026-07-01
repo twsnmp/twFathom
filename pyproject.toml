@@ -1,6 +1,6 @@
 [project]
 name = "twfathom"
-version = "0.2.0"
+version = "0.3.0"
 description = "Deeply fathom your data with AI."
 readme = "README.md"
 requires-python = ">=3.8"
@@ -22,7 +22,7 @@ Homepage = "https://github.com/twsnmp/twFathom"
 [tool.briefcase]
 project_name = "twFathom"
 bundle = "com.twsnmp"
-version = "0.2.0"
+version = "0.3.0"
 
 [tool.briefcase.app.twfathom]
 formal_name = "twFathom"
