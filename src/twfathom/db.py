@@ -105,6 +105,40 @@ def init_db():
         FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE
     );
     """)
+
+    # 8. occupancy_data table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS occupancy_data (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_id INTEGER NOT NULL,
+        timestamp TEXT NOT NULL,
+        occupancy INTEGER,
+        illuminance REAL,
+        battery REAL,
+        linkquality REAL,
+        voltage REAL,
+        device_temperature REAL,
+        power_outage_count INTEGER,
+        FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE
+    );
+    """)
+
+    # 9. contact_data table (window/door open-close sensor)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS contact_data (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_id INTEGER NOT NULL,
+        timestamp TEXT NOT NULL,
+        contact INTEGER,
+        battery REAL,
+        linkquality REAL,
+        voltage REAL,
+        device_temperature REAL,
+        power_outage_count INTEGER,
+        trigger_count INTEGER,
+        FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE
+    );
+    """)
     
     # Create indexes for time series queries
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_env_source_time ON environment_data (source_id, timestamp);")
@@ -112,6 +146,8 @@ def init_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_cpu_mem_disk_source_time ON cpu_mem_disk_data (source_id, timestamp);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_process_load_source_time ON process_load_data (source_id, timestamp);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_network_speed_source_time ON network_speed_data (source_id, timestamp);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_occupancy_source_time ON occupancy_data (source_id, timestamp);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_contact_source_time ON contact_data (source_id, timestamp);")
     
     # Check for legacy databases and migrate schema
     cursor.execute("PRAGMA table_info(sources);")
@@ -282,6 +318,30 @@ def insert_network_speed_data(source_id, sent=None, recv=None, tx_speed=None, rx
     conn.commit()
     conn.close()
 
+def insert_occupancy_data(source_id, occupancy=None, illuminance=None, battery=None, linkquality=None, voltage=None, device_temperature=None, power_outage_count=None, timestamp=None):
+    if timestamp is None:
+        timestamp = datetime.now().isoformat()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    INSERT INTO occupancy_data (source_id, timestamp, occupancy, illuminance, battery, linkquality, voltage, device_temperature, power_outage_count)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (source_id, timestamp, occupancy, illuminance, battery, linkquality, voltage, device_temperature, power_outage_count))
+    conn.commit()
+    conn.close()
+
+def insert_contact_data(source_id, contact=None, battery=None, linkquality=None, voltage=None, device_temperature=None, power_outage_count=None, trigger_count=None, timestamp=None):
+    if timestamp is None:
+        timestamp = datetime.now().isoformat()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    INSERT INTO contact_data (source_id, timestamp, contact, battery, linkquality, voltage, device_temperature, power_outage_count, trigger_count)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (source_id, timestamp, contact, battery, linkquality, voltage, device_temperature, power_outage_count, trigger_count))
+    conn.commit()
+    conn.close()
+
 # Data Retrieval
 def get_environment_history(source_id, limit=100):
     conn = get_db_connection()
@@ -383,6 +443,46 @@ def get_network_speed_history(source_id, limit=100):
     conn.close()
     return [dict(r) for r in reversed(rows)]
 
+def get_occupancy_history(source_id, limit=100):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if limit is None or limit <= 0:
+        cursor.execute("""
+        SELECT * FROM occupancy_data
+        WHERE source_id = ?
+        ORDER BY timestamp DESC
+        """, (source_id,))
+    else:
+        cursor.execute("""
+        SELECT * FROM occupancy_data
+        WHERE source_id = ?
+        ORDER BY timestamp DESC
+        LIMIT ?
+        """, (source_id, limit))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in reversed(rows)]
+
+def get_contact_history(source_id, limit=100):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if limit is None or limit <= 0:
+        cursor.execute("""
+        SELECT * FROM contact_data
+        WHERE source_id = ?
+        ORDER BY timestamp DESC
+        """, (source_id,))
+    else:
+        cursor.execute("""
+        SELECT * FROM contact_data
+        WHERE source_id = ?
+        ORDER BY timestamp DESC
+        LIMIT ?
+        """, (source_id, limit))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in reversed(rows)]
+
 def clear_source_data(source_id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -391,6 +491,8 @@ def clear_source_data(source_id):
     cursor.execute("DELETE FROM cpu_mem_disk_data WHERE source_id = ?", (source_id,))
     cursor.execute("DELETE FROM process_load_data WHERE source_id = ?", (source_id,))
     cursor.execute("DELETE FROM network_speed_data WHERE source_id = ?", (source_id,))
+    cursor.execute("DELETE FROM occupancy_data WHERE source_id = ?", (source_id,))
+    cursor.execute("DELETE FROM contact_data WHERE source_id = ?", (source_id,))
     conn.commit()
     conn.close()
 
@@ -403,7 +505,9 @@ def get_baseline_stats(source_id, data_type, preprocess_type='residual', window_
         'traffic': ['rx_pps', 'tx_pps', 'rx_bps', 'tx_bps'],
         'cpu_mem_disk': ['cpu', 'memory', 'disk'],
         'process_load': ['process', 'load'],
-        'network_speed': ['tx_speed', 'rx_speed']
+        'network_speed': ['tx_speed', 'rx_speed'],
+        'occupancy': ['occupancy', 'illuminance', 'battery', 'linkquality', 'voltage', 'device_temperature', 'power_outage_count'],
+        'contact': ['contact', 'battery', 'linkquality', 'voltage', 'device_temperature', 'power_outage_count', 'trigger_count']
     }
     cols = columns_map.get(data_type, [])
     if not cols:

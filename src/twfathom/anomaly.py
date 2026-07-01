@@ -23,7 +23,9 @@ def calculate_anomaly(history, data_type, preprocess_type='residual', window_siz
         'traffic': ['rx_pps', 'tx_pps', 'rx_bps', 'tx_bps'],
         'cpu_mem_disk': ['cpu', 'memory', 'disk'],
         'process_load': ['process', 'load'],
-        'network_speed': ['tx_speed', 'rx_speed']
+        'network_speed': ['tx_speed', 'rx_speed'],
+        'occupancy': ['occupancy', 'illuminance', 'battery', 'linkquality', 'voltage', 'device_temperature', 'power_outage_count'],
+        'contact': ['contact', 'battery', 'linkquality', 'voltage', 'device_temperature', 'power_outage_count', 'trigger_count']
     }
     
     cols = columns_map.get(data_type, [])
@@ -164,7 +166,10 @@ def calculate_anomaly(history, data_type, preprocess_type='residual', window_siz
             'rx_bps': '受信速度', 'tx_bps': '送信速度',
             'cpu': 'CPU 使用率', 'memory': 'メモリ使用率', 'disk': 'ディスク使用率',
             'process': 'プロセス数', 'load': 'システム負荷',
-            'tx_speed': '送信速度', 'rx_speed': '受信速度'
+            'tx_speed': '送信速度', 'rx_speed': '受信速度',
+            'occupancy': '人感検知', 'battery': 'バッテリー残量', 'linkquality': 'リンク品質',
+            'voltage': '電圧', 'device_temperature': 'デバイス温度', 'power_outage_count': '停電回数',
+            'contact': '開閉状態', 'trigger_count': 'トリガー回数'
         }
         col_name = col_names_ja.get(col_ja, col_ja) if col_ja else "不明な指標"
         val_str = f"{latest_detail['val']:.2f}" if latest_detail['val'] is not None else "N/A"

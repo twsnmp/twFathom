@@ -24,6 +24,14 @@ SYSTEM_SPEED_KEYWORDS = {
     'tx_speed', 'rx_speed', 'sent', 'recv', 'transmit_speed', 'receive_speed', 'speed', '通信', '送信', '受信'
 }
 
+OCCUPANCY_KEYWORDS = {
+    'occupancy', 'motion', 'human', 'presence', 'sensor', '人感', '動体'
+}
+
+CONTACT_KEYWORDS = {
+    'contact', 'door', 'window', '開閉', '窓', 'ドア'
+}
+
 # Mapping patterns using regular expressions for flexible naming
 ENV_MAPS = {
     'temperature': [re.compile(r'temp(erature)?$', re.I), re.compile(r'^t$', re.I)],
@@ -59,6 +67,26 @@ SYSTEM_SPEED_MAPS = {
     'rx_speed': [re.compile(r'rx_?speed$', re.I), re.compile(r'receive_?speed$', re.I), re.compile(r'受信速度$', re.I)]
 }
 
+OCCUPANCY_MAPS = {
+    'occupancy': [re.compile(r'occupancy$', re.I), re.compile(r'motion$', re.I)],
+    'illuminance': [re.compile(r'illu(minance)?$', re.I), re.compile(r'lux$', re.I), re.compile(r'light$', re.I)],
+    'battery': [re.compile(r'bat(tery)?$', re.I)],
+    'linkquality': [re.compile(r'linkquality$', re.I), re.compile(r'rssi$', re.I)],
+    'voltage': [re.compile(r'volt(age)?$', re.I)],
+    'device_temperature': [re.compile(r'device_temp(erature)?$', re.I), re.compile(r'temp(erature)?$', re.I)],
+    'power_outage_count': [re.compile(r'power_outage_count$', re.I)]
+}
+
+CONTACT_MAPS = {
+    'contact': [re.compile(r'contact$', re.I), re.compile(r'door$', re.I), re.compile(r'window$', re.I)],
+    'battery': [re.compile(r'bat(tery)?$', re.I)],
+    'linkquality': [re.compile(r'linkquality$', re.I), re.compile(r'rssi$', re.I)],
+    'voltage': [re.compile(r'volt(age)?$', re.I)],
+    'device_temperature': [re.compile(r'device_temp(erature)?$', re.I), re.compile(r'temp(erature)?$', re.I)],
+    'power_outage_count': [re.compile(r'power_outage_count$', re.I)],
+    'trigger_count': [re.compile(r'trigger_count$', re.I)]
+}
+
 TIMESTAMP_MAPS = [
     re.compile(r'time(stamp)?$', re.I),
     re.compile(r'date(time)?$', re.I),
@@ -92,13 +120,15 @@ def match_key(key, patterns):
 def detect_data_type(keys):
     """
     Given a list of keys (headers), detect if it represents 'environment', 'traffic',
-    'cpu_mem_disk', 'process_load', or 'network_speed' data.
+    'cpu_mem_disk', 'process_load', 'network_speed', 'occupancy', or 'contact' data.
     """
     env_matches = 0
     traffic_matches = 0
     cpu_mem_disk_matches = 0
     process_load_matches = 0
     network_speed_matches = 0
+    occupancy_matches = 0
+    contact_matches = 0
     
     for key in keys:
         key_lower = str(key).lower()
@@ -112,18 +142,26 @@ def detect_data_type(keys):
             process_load_matches += 1
         if any(kw in key_lower for kw in SYSTEM_SPEED_KEYWORDS):
             network_speed_matches += 1
+        if any(kw in key_lower for kw in OCCUPANCY_KEYWORDS):
+            occupancy_matches += 1
+        if any(kw in key_lower for kw in CONTACT_KEYWORDS):
+            contact_matches += 1
             
     matches = {
         'environment': env_matches,
         'traffic': traffic_matches,
         'cpu_mem_disk': cpu_mem_disk_matches,
         'process_load': process_load_matches,
-        'network_speed': network_speed_matches
+        'network_speed': network_speed_matches,
+        'occupancy': occupancy_matches,
+        'contact': contact_matches
     }
     
     best_type = 'unknown'
     max_match = 0
-    for t, m in matches.items():
+    priority = ['contact', 'occupancy', 'network_speed', 'process_load', 'cpu_mem_disk', 'traffic', 'environment']
+    for t in priority:
+        m = matches.get(t, 0)
         if m > max_match:
             max_match = m
             best_type = t
@@ -205,6 +243,50 @@ def map_fields(data_dict, schema_type):
                 if match_key(key, patterns):
                     try:
                         mapped[target] = float(val)
+                        break
+                    except (ValueError, TypeError):
+                        pass
+    elif schema_type == 'occupancy':
+        for target, patterns in OCCUPANCY_MAPS.items():
+            mapped[target] = None
+            for key, val in data_dict.items():
+                if match_key(key, patterns):
+                    try:
+                        if target == 'occupancy':
+                            if isinstance(val, bool):
+                                mapped[target] = 1 if val else 0
+                            elif str(val).lower() in ('true', '1', 'yes', 'on'):
+                                mapped[target] = 1
+                            elif str(val).lower() in ('false', '0', 'no', 'off'):
+                                mapped[target] = 0
+                            else:
+                                mapped[target] = int(float(val))
+                        elif target == 'power_outage_count':
+                            mapped[target] = int(float(val))
+                        else:
+                            mapped[target] = float(val)
+                        break
+                    except (ValueError, TypeError):
+                        pass
+    elif schema_type == 'contact':
+        for target, patterns in CONTACT_MAPS.items():
+            mapped[target] = None
+            for key, val in data_dict.items():
+                if match_key(key, patterns):
+                    try:
+                        if target == 'contact':
+                            if isinstance(val, bool):
+                                mapped[target] = 1 if val else 0
+                            elif str(val).lower() in ('true', '1', 'yes', 'on', 'closed', 'close'):
+                                mapped[target] = 1
+                            elif str(val).lower() in ('false', '0', 'no', 'off', 'open'):
+                                mapped[target] = 0
+                            else:
+                                mapped[target] = int(float(val))
+                        elif target in ('power_outage_count', 'trigger_count'):
+                            mapped[target] = int(float(val))
+                        else:
+                            mapped[target] = float(val)
                         break
                     except (ValueError, TypeError):
                         pass

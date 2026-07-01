@@ -182,6 +182,8 @@ async function loadSources() {
             else if (src.data_type === 'cpu_mem_disk') dataTypeLabel = 'CPU・メモリ・ディスク';
             else if (src.data_type === 'process_load') dataTypeLabel = 'プロセス・負荷';
             else if (src.data_type === 'network_speed') dataTypeLabel = '通信スピード';
+            else if (src.data_type === 'occupancy') dataTypeLabel = '人感センサー';
+            else if (src.data_type === 'contact') dataTypeLabel = '窓開閉センサー';
             
             const activeBadgeClass = src.active ? 'badge-active' : 'badge-paused';
             const activeText = src.active ? '監視中' : '一時停止';

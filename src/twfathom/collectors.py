@@ -9,6 +9,8 @@ from .db import (
     insert_cpu_mem_disk_data,
     insert_process_load_data,
     insert_network_speed_data,
+    insert_occupancy_data,
+    insert_contact_data,
     get_source, 
     update_source,
     get_sources
@@ -101,6 +103,32 @@ def https_poll_loop(source_id, config, interval, stop_event):
                                         timestamp=row.get('timestamp')
                                     )
                                     print(f"  Inserted Speed: TxSpeed={row.get('tx_speed')}, RxSpeed={row.get('rx_speed')}")
+                                elif data_type == 'occupancy':
+                                    insert_occupancy_data(
+                                        source_id,
+                                        occupancy=row.get('occupancy'),
+                                        illuminance=row.get('illuminance'),
+                                        battery=row.get('battery'),
+                                        linkquality=row.get('linkquality'),
+                                        voltage=row.get('voltage'),
+                                        device_temperature=row.get('device_temperature'),
+                                        power_outage_count=row.get('power_outage_count'),
+                                        timestamp=row.get('timestamp')
+                                    )
+                                    print(f"  Inserted Occupancy: Occupancy={row.get('occupancy')}, Battery={row.get('battery')}")
+                                elif data_type == 'contact':
+                                    insert_contact_data(
+                                        source_id,
+                                        contact=row.get('contact'),
+                                        battery=row.get('battery'),
+                                        linkquality=row.get('linkquality'),
+                                        voltage=row.get('voltage'),
+                                        device_temperature=row.get('device_temperature'),
+                                        power_outage_count=row.get('power_outage_count'),
+                                        trigger_count=row.get('trigger_count'),
+                                        timestamp=row.get('timestamp')
+                                    )
+                                    print(f"  Inserted Contact: Contact={row.get('contact')}, Battery={row.get('battery')}")
         except Exception as e:
             print(f"[HTTPS Collector {source_id}] Error polling source: {e}")
             
@@ -189,6 +217,32 @@ def file_poll_loop(source_id, config, interval, stop_event):
                                         timestamp=row.get('timestamp')
                                     )
                                     print(f"  Inserted Speed: TxSpeed={row.get('tx_speed')}, RxSpeed={row.get('rx_speed')}")
+                                elif data_type == 'occupancy':
+                                    insert_occupancy_data(
+                                        source_id,
+                                        occupancy=row.get('occupancy'),
+                                        illuminance=row.get('illuminance'),
+                                        battery=row.get('battery'),
+                                        linkquality=row.get('linkquality'),
+                                        voltage=row.get('voltage'),
+                                        device_temperature=row.get('device_temperature'),
+                                        power_outage_count=row.get('power_outage_count'),
+                                        timestamp=row.get('timestamp')
+                                    )
+                                    print(f"  Inserted Occupancy: Occupancy={row.get('occupancy')}, Battery={row.get('battery')}")
+                                elif data_type == 'contact':
+                                    insert_contact_data(
+                                        source_id,
+                                        contact=row.get('contact'),
+                                        battery=row.get('battery'),
+                                        linkquality=row.get('linkquality'),
+                                        voltage=row.get('voltage'),
+                                        device_temperature=row.get('device_temperature'),
+                                        power_outage_count=row.get('power_outage_count'),
+                                        trigger_count=row.get('trigger_count'),
+                                        timestamp=row.get('timestamp')
+                                    )
+                                    print(f"  Inserted Contact: Contact={row.get('contact')}, Battery={row.get('battery')}")
             elif filepath and not os.path.exists(filepath):
                 print(f"[File Collector {source_id}] File does not exist: {filepath}")
         except Exception as e:
@@ -296,8 +350,34 @@ def mqtt_listener(source_id, config, stop_event):
                                 timestamp=row.get('timestamp')
                             )
                             print(f"  Inserted Speed: TxSpeed={row.get('tx_speed')}, RxSpeed={row.get('rx_speed')}")
+                        elif data_type == 'occupancy':
+                            insert_occupancy_data(
+                                source_id,
+                                occupancy=row.get('occupancy'),
+                                illuminance=row.get('illuminance'),
+                                battery=row.get('battery'),
+                                linkquality=row.get('linkquality'),
+                                voltage=row.get('voltage'),
+                                device_temperature=row.get('device_temperature'),
+                                power_outage_count=row.get('power_outage_count'),
+                                timestamp=row.get('timestamp')
+                            )
+                            print(f"  Inserted Occupancy: Occupancy={row.get('occupancy')}, Battery={row.get('battery')}")
+                        elif data_type == 'contact':
+                            insert_contact_data(
+                                source_id,
+                                contact=row.get('contact'),
+                                battery=row.get('battery'),
+                                linkquality=row.get('linkquality'),
+                                voltage=row.get('voltage'),
+                                device_temperature=row.get('device_temperature'),
+                                power_outage_count=row.get('power_outage_count'),
+                                trigger_count=row.get('trigger_count'),
+                                timestamp=row.get('timestamp')
+                            )
+                            print(f"  Inserted Contact: Contact={row.get('contact')}, Battery={row.get('battery')}")
                 else:
-                    print("  Warning: Message payload was not mapped to any known data schema (environment, traffic, cpu_mem_disk, process_load, network_speed).")
+                    print("  Warning: Message payload was not mapped to any known data schema (environment, traffic, cpu_mem_disk, process_load, network_speed, occupancy, contact).")
         except Exception as e:
             print(f"[MQTT Collector {source_id}] Error in MQTT message callback: {e}")
             

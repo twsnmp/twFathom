@@ -111,6 +111,12 @@ class Bridge:
     def get_network_speed_history(self, source_id, limit=-1):
         return db.get_network_speed_history(source_id, limit)
 
+    def get_occupancy_history(self, source_id, limit=-1):
+        return db.get_occupancy_history(source_id, limit)
+
+    def get_contact_history(self, source_id, limit=-1):
+        return db.get_contact_history(source_id, limit)
+
     def open_dashboard(self, source_id):
         if source_id in self._dashboard_windows:
             try:

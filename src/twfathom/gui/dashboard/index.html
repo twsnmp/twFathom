@@ -226,6 +226,25 @@
             }
         }
 
+        @keyframes pulse-glow {
+            0% { 
+                text-shadow: 0 0 4px var(--color-danger);
+                transform: scale(1);
+            }
+            50% { 
+                text-shadow: 0 0 16px var(--color-danger), 0 0 24px var(--color-danger);
+                transform: scale(1.05);
+            }
+            100% { 
+                text-shadow: 0 0 4px var(--color-danger);
+                transform: scale(1);
+            }
+        }
+        .pulse-animation {
+            animation: pulse-glow 1.5s infinite ease-in-out;
+            display: inline-block;
+        }
+
         /* Resize Handles styles */
         .resize-handle-r {
             position: absolute;

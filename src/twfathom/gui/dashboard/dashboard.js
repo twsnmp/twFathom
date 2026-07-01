@@ -1181,6 +1181,377 @@ function initChart(type, data) {
                 }
             ]
         };
+    } else if (type === 'occupancy') {
+        const OCC_FIELDS = {
+            occupancy: {
+                name: '人感検知',
+                color: '#ef4444',
+                areaColor: 'rgba(239, 68, 68, 0.15)'
+            },
+            illuminance: {
+                name: '照度 (lx)',
+                color: '#bd00ff',
+                areaColor: 'rgba(189, 0, 255, 0.1)'
+            },
+            battery: {
+                name: 'バッテリー (%)',
+                color: '#10b981',
+                areaColor: 'rgba(16, 185, 129, 0.1)'
+            },
+            device_temperature: {
+                name: 'デバイス温度 (°C)',
+                color: '#f59e0b',
+                areaColor: 'rgba(245, 158, 11, 0.1)'
+            },
+            linkquality: {
+                name: 'リンク品質 (LQI)',
+                color: '#00d2ff',
+                areaColor: 'rgba(0, 210, 255, 0.1)'
+            },
+            voltage: {
+                name: '電圧 (mV)',
+                color: '#00f5d4',
+                areaColor: 'rgba(0, 245, 212, 0.1)'
+            }
+        };
+
+        const otherKeys = ['illuminance', 'battery', 'device_temperature', 'linkquality', 'voltage'];
+        const availableKeys = otherKeys.filter(key => data.some(d => d[key] !== null && d[key] !== undefined));
+        
+        let activeOtherKey = safeStorage.getItem(`active_right_axis_${sourceId}`);
+        if (!activeOtherKey || !availableKeys.includes(activeOtherKey)) {
+            activeOtherKey = availableKeys[0] || null;
+        }
+
+        // Render pill selector in header
+        const controlsDom = document.getElementById('chart-controls');
+        if (controlsDom) {
+            if (availableKeys.length > 1) {
+                let pillsHtml = '<div class="pill-selector">';
+                availableKeys.forEach(key => {
+                    const isActive = (key === activeOtherKey);
+                    const label = OCC_FIELDS[key].name.split(' ')[0];
+                    pillsHtml += `<button class="pill-btn${isActive ? ' active' : ''}" data-key="${key}">${label}</button>`;
+                });
+                pillsHtml += '</div>';
+                controlsDom.innerHTML = pillsHtml;
+                
+                // Add event listeners to buttons
+                controlsDom.querySelectorAll('.pill-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const selectedKey = e.target.getAttribute('data-key');
+                        safeStorage.setItem(`active_right_axis_${sourceId}`, selectedKey);
+                        lastDataSignature = ''; // Reset signature to force redraw
+                        pollDashboard();
+                    });
+                });
+            } else {
+                controlsDom.innerHTML = '';
+            }
+        }
+
+        let legendData = [OCC_FIELDS.occupancy.name];
+        if (activeOtherKey) {
+            legendData.push(OCC_FIELDS[activeOtherKey].name);
+        }
+
+        const yAxisConfig = [
+            {
+                type: 'value',
+                name: '人感検知',
+                min: 0,
+                max: 1,
+                interval: 1,
+                axisLabel: {
+                    color: '#9ca3af',
+                    formatter: function(value) {
+                        return value === 1 ? '検知' : 'クリア';
+                    }
+                },
+                splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } }
+            }
+        ];
+
+        if (activeOtherKey) {
+            yAxisConfig.push({
+                type: 'value',
+                name: OCC_FIELDS[activeOtherKey].name.split(' ')[0],
+                scale: true,
+                axisLabel: { color: '#9ca3af' },
+                splitLine: { show: false }
+            });
+        }
+
+        const seriesConfig = [
+            {
+                name: OCC_FIELDS.occupancy.name,
+                type: 'line',
+                step: 'start', // beautiful step layout for binary state
+                smooth: false,
+                showSymbol: false,
+                data: data.map(d => d.occupancy),
+                itemStyle: { color: OCC_FIELDS.occupancy.color },
+                lineStyle: { width: 3 },
+                yAxisIndex: 0,
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: 'rgba(239, 68, 68, 0.25)' },
+                        { offset: 1, color: 'rgba(239, 68, 68, 0.02)' }
+                    ])
+                }
+            }
+        ];
+
+        if (activeOtherKey) {
+            seriesConfig.push({
+                name: OCC_FIELDS[activeOtherKey].name,
+                type: 'line',
+                smooth: true,
+                showSymbol: true,
+                symbol: 'circle',
+                symbolSize: 6,
+                data: data.map(d => d[activeOtherKey]),
+                itemStyle: { color: OCC_FIELDS[activeOtherKey].color },
+                lineStyle: { width: 3 },
+                yAxisIndex: 1,
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: OCC_FIELDS[activeOtherKey].areaColor },
+                        { offset: 1, color: 'rgba(0, 0, 0, 0)' }
+                    ])
+                }
+            });
+        }
+
+        option = {
+            backgroundColor: 'transparent',
+            tooltip: {
+                trigger: 'axis',
+                backgroundColor: 'rgba(23, 25, 35, 0.9)',
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+                textStyle: { color: '#f3f4f6' },
+                axisPointer: { type: 'cross' },
+                formatter: function (params) {
+                    let result = `${params[0].axisValue}<br/>`;
+                    params.forEach(p => {
+                        if (p.seriesName === OCC_FIELDS.occupancy.name) {
+                            const valText = p.value === 1 ? '<span style="color:#ef4444;font-weight:bold;">検知中 (感知)</span>' : '<span style="color:#10b981;">クリア (無人)</span>';
+                            result += `${p.marker} ${p.seriesName}: ${valText}<br/>`;
+                        } else {
+                            result += `${p.marker} ${p.seriesName}: <b>${p.value}</b><br/>`;
+                        }
+                    });
+                    return result;
+                }
+            },
+            legend: {
+                data: legendData,
+                selected: savedLegend,
+                textStyle: { color: '#9ca3af', fontFamily: 'Inter' }
+            },
+            grid: baseGrid,
+            dataZoom: baseDataZoom,
+            xAxis: {
+                type: 'category',
+                boundaryGap: data.length <= 1,
+                data: timestamps,
+                axisLabel: { 
+                    color: '#9ca3af',
+                    formatter: function(value) {
+                        return value && value.includes(' ') ? value.split(' ')[1] : value;
+                    }
+                },
+                axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.1)' } }
+            },
+            yAxis: yAxisConfig,
+            series: seriesConfig
+        };
+    } else if (type === 'contact') {
+        const CON_FIELDS = {
+            contact: {
+                name: '開閉状態',
+                color: '#00d2ff',
+                areaColor: 'rgba(0, 210, 255, 0.15)'
+            },
+            battery: {
+                name: 'バッテリー (%)',
+                color: '#10b981',
+                areaColor: 'rgba(16, 185, 129, 0.1)'
+            },
+            device_temperature: {
+                name: 'デバイス温度 (°C)',
+                color: '#f59e0b',
+                areaColor: 'rgba(245, 158, 11, 0.1)'
+            },
+            linkquality: {
+                name: 'リンク品質 (LQI)',
+                color: '#bd00ff',
+                areaColor: 'rgba(189, 0, 255, 0.1)'
+            },
+            voltage: {
+                name: '電圧 (mV)',
+                color: '#00f5d4',
+                areaColor: 'rgba(0, 245, 212, 0.1)'
+            },
+            trigger_count: {
+                name: 'トリガー回数',
+                color: '#f59e0b',
+                areaColor: 'rgba(245, 158, 11, 0.1)'
+            }
+        };
+
+        const otherKeys = ['battery', 'device_temperature', 'linkquality', 'voltage', 'trigger_count'];
+        const availableKeys = otherKeys.filter(key => data.some(d => d[key] !== null && d[key] !== undefined));
+
+        let activeOtherKey = safeStorage.getItem(`active_right_axis_${sourceId}`);
+        if (!activeOtherKey || !availableKeys.includes(activeOtherKey)) {
+            activeOtherKey = availableKeys[0] || null;
+        }
+
+        // Render pill selector in header
+        const controlsDom = document.getElementById('chart-controls');
+        if (controlsDom) {
+            if (availableKeys.length > 1) {
+                let pillsHtml = '<div class="pill-selector">';
+                availableKeys.forEach(key => {
+                    const isActive = (key === activeOtherKey);
+                    const label = CON_FIELDS[key].name.split(' ')[0];
+                    pillsHtml += `<button class="pill-btn${isActive ? ' active' : ''}" data-key="${key}">${label}</button>`;
+                });
+                pillsHtml += '</div>';
+                controlsDom.innerHTML = pillsHtml;
+
+                controlsDom.querySelectorAll('.pill-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const selectedKey = e.target.getAttribute('data-key');
+                        safeStorage.setItem(`active_right_axis_${sourceId}`, selectedKey);
+                        lastDataSignature = '';
+                        pollDashboard();
+                    });
+                });
+            } else {
+                controlsDom.innerHTML = '';
+            }
+        }
+
+        let legendData = [CON_FIELDS.contact.name];
+        if (activeOtherKey) {
+            legendData.push(CON_FIELDS[activeOtherKey].name);
+        }
+
+        const yAxisConfig = [
+            {
+                type: 'value',
+                name: '開閉状態',
+                min: 0,
+                max: 1,
+                interval: 1,
+                axisLabel: {
+                    color: '#9ca3af',
+                    formatter: function(value) {
+                        return value === 1 ? '閉' : '開';
+                    }
+                },
+                splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } }
+            }
+        ];
+
+        if (activeOtherKey) {
+            yAxisConfig.push({
+                type: 'value',
+                name: CON_FIELDS[activeOtherKey].name.split(' ')[0],
+                scale: true,
+                axisLabel: { color: '#9ca3af' },
+                splitLine: { show: false }
+            });
+        }
+
+        const seriesConfig = [
+            {
+                name: CON_FIELDS.contact.name,
+                type: 'line',
+                step: 'start',
+                smooth: false,
+                showSymbol: false,
+                data: data.map(d => d.contact),
+                itemStyle: { color: CON_FIELDS.contact.color },
+                lineStyle: { width: 3 },
+                yAxisIndex: 0,
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: 'rgba(0, 210, 255, 0.25)' },
+                        { offset: 1, color: 'rgba(0, 210, 255, 0.02)' }
+                    ])
+                }
+            }
+        ];
+
+        if (activeOtherKey) {
+            seriesConfig.push({
+                name: CON_FIELDS[activeOtherKey].name,
+                type: 'line',
+                smooth: true,
+                showSymbol: true,
+                symbol: 'circle',
+                symbolSize: 6,
+                data: data.map(d => d[activeOtherKey]),
+                itemStyle: { color: CON_FIELDS[activeOtherKey].color },
+                lineStyle: { width: 3 },
+                yAxisIndex: 1,
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: CON_FIELDS[activeOtherKey].areaColor },
+                        { offset: 1, color: 'rgba(0, 0, 0, 0)' }
+                    ])
+                }
+            });
+        }
+
+        option = {
+            backgroundColor: 'transparent',
+            tooltip: {
+                trigger: 'axis',
+                backgroundColor: 'rgba(23, 25, 35, 0.9)',
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+                textStyle: { color: '#f3f4f6' },
+                axisPointer: { type: 'cross' },
+                formatter: function (params) {
+                    let result = `${params[0].axisValue}<br/>`;
+                    params.forEach(p => {
+                        if (p.seriesName === CON_FIELDS.contact.name) {
+                            const valText = p.value === 1
+                                ? '<span style="color:#00d2ff;font-weight:bold;">閉 (Closed)</span>'
+                                : '<span style="color:#ef4444;">開 (Open)</span>';
+                            result += `${p.marker} ${p.seriesName}: ${valText}<br/>`;
+                        } else {
+                            result += `${p.marker} ${p.seriesName}: <b>${p.value}</b><br/>`;
+                        }
+                    });
+                    return result;
+                }
+            },
+            legend: {
+                data: legendData,
+                selected: savedLegend,
+                textStyle: { color: '#9ca3af', fontFamily: 'Inter' }
+            },
+            grid: baseGrid,
+            dataZoom: baseDataZoom,
+            xAxis: {
+                type: 'category',
+                boundaryGap: data.length <= 1,
+                data: timestamps,
+                axisLabel: {
+                    color: '#9ca3af',
+                    formatter: function(value) {
+                        return value && value.includes(' ') ? value.split(' ')[1] : value;
+                    }
+                },
+                axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.1)' } }
+            },
+            yAxis: yAxisConfig,
+            series: seriesConfig
+        };
     }
     
     chart.setOption(option, true);
@@ -1311,6 +1682,84 @@ function updateKpiCards(type, latestData) {
             `;
             list.appendChild(card);
         });
+    } else if (type === 'occupancy') {
+        const isOccupied = latestData.occupancy === 1;
+        const presenceLabel = isOccupied ? '検知中 (感知)' : 'クリア (無人)';
+        const presenceColor = isOccupied ? 'var(--color-danger)' : 'var(--color-success)';
+        
+        const fields = [
+            { label: '人感検知', valText: presenceLabel, color: presenceColor, isCustom: true },
+            { label: 'バッテリー', val: latestData.battery, unit: '%', color: latestData.battery < 20 ? 'var(--color-danger)' : 'var(--color-success)' },
+            { label: '照度', val: latestData.illuminance, unit: 'lx', color: '#bd00ff' },
+            { label: 'デバイス温度', val: latestData.device_temperature, unit: '°C', color: 'var(--color-primary)' },
+            { label: 'リンク品質', val: latestData.linkquality, unit: 'LQI', color: 'var(--color-warning)' },
+            { label: '電圧', val: latestData.voltage, unit: 'mV', color: '#00f5d4' }
+        ];
+        
+        fields.forEach(f => {
+            const card = document.createElement('div');
+            card.className = 'glass-card kpi-card';
+            card.style.setProperty('--card-accent', f.color);
+            
+            if (f.isCustom) {
+                const pulseClass = isOccupied ? 'pulse-animation' : '';
+                card.innerHTML = `
+                    <span class="kpi-title">${f.label}</span>
+                    <div class="kpi-value ${pulseClass}" style="color: ${f.color}; font-size: 16px; font-weight: bold; margin-top: 4px;">
+                        ${f.valText}
+                    </div>
+                `;
+            } else {
+                if (f.val === null || f.val === undefined) return;
+                card.innerHTML = `
+                    <span class="kpi-title">${f.label}</span>
+                    <div class="kpi-value">${formatNumber(f.val, f.label === '電圧' ? 0 : 1)}<span class="kpi-unit">${f.unit}</span></div>
+                `;
+            }
+            list.appendChild(card);
+        });
+    } else if (type === 'contact') {
+        const isClosed = latestData.contact === 1;
+        const contactLabel = isClosed ? '閉 (Closed)' : '開 (Open)';
+        const contactColor = isClosed ? '#00d2ff' : 'var(--color-danger)';
+        const batteryColor = (latestData.battery !== null && latestData.battery !== undefined && latestData.battery < 20)
+            ? 'var(--color-danger)' : 'var(--color-success)';
+
+        const fields = [
+            { label: '開閉状態', valText: contactLabel, color: contactColor, isCustom: true },
+            { label: 'バッテリー', val: latestData.battery, unit: '%', color: batteryColor },
+            { label: 'デバイス温度', val: latestData.device_temperature, unit: '°C', color: '#f59e0b' },
+            { label: 'リンク品質', val: latestData.linkquality, unit: 'LQI', color: '#bd00ff' },
+            { label: '電圧', val: latestData.voltage, unit: 'mV', color: '#00f5d4' },
+            { label: 'トリガー回数', val: latestData.trigger_count, unit: '回', color: 'var(--color-warning)' },
+            { label: '停電回数', val: latestData.power_outage_count, unit: '回', color: '#e0aaff' }
+        ];
+
+        fields.forEach(f => {
+            const card = document.createElement('div');
+            card.className = 'glass-card kpi-card';
+            card.style.setProperty('--card-accent', f.color);
+
+            if (f.isCustom) {
+                // closed=閉: アイコン付き強調表示
+                const iconSvg = isClosed
+                    ? `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`
+                    : `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>`;
+                card.innerHTML = `
+                    <span class="kpi-title">${f.label}</span>
+                    <div class="kpi-value" style="color: ${f.color}; font-size: 15px; font-weight: bold; margin-top: 4px; display:flex; align-items:center;">
+                        ${iconSvg}${f.valText}
+                    </div>
+                `;
+            } else {
+                if (f.val === null || f.val === undefined) return;
+                card.innerHTML = `
+                    <span class="kpi-title">${f.label}</span>
+                    <div class="kpi-value">${formatNumber(f.val, f.label === '電圧' ? 0 : (f.label.includes('回') ? 0 : 1))}<span class="kpi-unit">${f.unit}</span></div>
+                `;
+            }
+            list.appendChild(card);
+        });
     }
 }
 
@@ -1409,6 +1858,30 @@ async function pollDashboard() {
                 updateKpiCards('network_speed', history[history.length - 1]);
                 if (!anomalyEnabled) {
                     initChart('network_speed', history);
+                }
+            }
+        } else if (dataType === 'occupancy') {
+            document.getElementById('chart-main-title').textContent = '人感センサー 時系列データ';
+            const history = await window.pywebview.api.get_occupancy_history(sourceId, -1);
+            
+            const signature = history.length > 0 ? `${history.length}_${history[history.length - 1].timestamp}` : 'empty';
+            if (signature !== lastDataSignature) {
+                lastDataSignature = signature;
+                updateKpiCards('occupancy', history[history.length - 1]);
+                if (!anomalyEnabled) {
+                    initChart('occupancy', history);
+                }
+            }
+        } else if (dataType === 'contact') {
+            document.getElementById('chart-main-title').textContent = '窓開閉センサー 時系列データ';
+            const history = await window.pywebview.api.get_contact_history(sourceId, -1);
+
+            const signature = history.length > 0 ? `${history.length}_${history[history.length - 1].timestamp}` : 'empty';
+            if (signature !== lastDataSignature) {
+                lastDataSignature = signature;
+                updateKpiCards('contact', history[history.length - 1]);
+                if (!anomalyEnabled) {
+                    initChart('contact', history);
                 }
             }
         } else {

@@ -191,6 +191,27 @@ class TestFileParsers(unittest.TestCase):
         self.assertAlmostEqual(results[0]['tx_speed'], 0.030452213333333332)
         self.assertAlmostEqual(results[0]['rx_speed'], 0.0016564266666666667)
 
+    def test_occupancy_json(self):
+        payload = '{"battery":100,"detection_interval":30,"device_temperature":28,"illuminance":24,"linkquality":84,"motion_sensitivity":"medium","occupancy":false,"power_outage_count":2,"trigger_indicator":false,"voltage":3020}'
+        dtype, results = auto_parse_and_map(payload)
+        
+        self.assertEqual(dtype, 'occupancy')
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['occupancy'], 0)
+        self.assertEqual(results[0]['battery'], 100.0)
+        self.assertEqual(results[0]['device_temperature'], 28.0)
+        self.assertEqual(results[0]['illuminance'], 24.0)
+        self.assertEqual(results[0]['linkquality'], 84.0)
+        self.assertEqual(results[0]['voltage'], 3020.0)
+        self.assertEqual(results[0]['power_outage_count'], 2)
+
+    def test_occupancy_json_true(self):
+        payload = '{"occupancy":true,"battery":80}'
+        dtype, results = auto_parse_and_map(payload)
+        self.assertEqual(dtype, 'occupancy')
+        self.assertEqual(results[0]['occupancy'], 1)
+        self.assertEqual(results[0]['battery'], 80.0)
+
 if __name__ == '__main__':
     unittest.main()
 
